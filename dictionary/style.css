@@ -323,6 +323,34 @@ input, button { font-size: inherit; }
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
+/* Clickable search result cards */
+.dict-entry-clickable {
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.dict-entry-clickable:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 16px rgba(37,99,235,0.1);
+}
+
+.dict-word-link {
+  font-size: inherit;
+  font-weight: inherit;
+  color: var(--accent);
+  letter-spacing: inherit;
+  line-height: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.dict-word-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
 /* Word heading — large, bold, dictionary-style */
 .dict-word {
   font-size: 26px;
@@ -724,19 +752,58 @@ kbd {
 
 
 /* ================================================================
-   CONTRIBUTE PROMPT
+   CONTRIBUTE PROMPT (detail view)
    ================================================================ */
 .dict-contribute {
   margin-top: 24px;
-  padding: 16px 20px;
+  padding: 20px 24px;
   background: var(--bg);
   border-radius: 8px;
   font-size: 14px;
   color: var(--text-2);
+  border: 1px solid var(--border-light);
 }
 
-.dict-contribute p {
+.dict-contribute-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.dict-contribute-text {
   margin-bottom: 8px;
+  line-height: 1.7;
+}
+
+.dict-contribute-list {
+  list-style: none;
+  padding-left: 8px;
+  margin-bottom: 12px;
+}
+
+.dict-contribute-list li {
+  padding: 2px 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.dict-contribute-list li::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  background: var(--accent);
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.dict-contribute-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 .contribute-link {
@@ -748,8 +815,51 @@ kbd {
   color: var(--accent);
 }
 
+.contribute-link-primary {
+  padding: 8px 16px;
+  background: var(--accent-subtle);
+  border-radius: 6px;
+  width: fit-content;
+}
+
 .contribute-link:hover {
   text-decoration: underline;
+}
+
+
+/* ================================================================
+   DETAIL BACK BUTTON
+   ================================================================ */
+.detail-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.detail-back-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+
+/* ================================================================
+   THESAURUS — related count line
+   ================================================================ */
+.dict-related-count {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-bottom: 10px;
 }
 
 

@@ -422,9 +422,9 @@ const UI = (() => {
     let html = '';
     for (const [, group] of groups) {
       const shareUrl = _shareURL(group.word, lang);
-      html += `<div class="dict-entry">`;
+      html += `<div class="dict-entry dict-entry-clickable">`;
       html += `<div class="dict-entry-header">`;
-      html += `  <div class="dict-word">${_escapeHtml(group.word)}</div>`;
+      html += `  <button class="dict-word dict-word-link" data-word="${_escapeHtml(group.word)}">${_escapeHtml(group.word)}</button>`;
       html += `  <button class="share-btn" data-url="${_escapeHtml(shareUrl)}" title="Copy link to this word" aria-label="Share">`;
       html += `    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
       html += `  </button>`;
@@ -458,7 +458,31 @@ const UI = (() => {
 
     // Wire share buttons
     $resultsContainer.querySelectorAll('.share-btn').forEach(btn => {
-      btn.addEventListener('click', () => _copyToClipboard(btn.dataset.url));
+      btn.addEventListener('click', (e) => { e.stopPropagation(); _copyToClipboard(btn.dataset.url); });
+    });
+
+    // Wire word-heading clicks → open detail view
+    $resultsContainer.querySelectorAll('.dict-word-link').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        $searchInput.value = btn.dataset.word;
+        _lastQuery = '';
+        _executeSearch(btn.dataset.word, true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+
+    // Wire entire card click → open detail view
+    $resultsContainer.querySelectorAll('.dict-entry-clickable').forEach(card => {
+      card.addEventListener('click', () => {
+        const word = card.querySelector('.dict-word-link')?.dataset?.word;
+        if (word) {
+          $searchInput.value = word;
+          _lastQuery = '';
+          _executeSearch(word, true);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
     });
 
     if (fromCache) {
@@ -489,6 +513,10 @@ const UI = (() => {
 
     const shareUrl = _shareURL(sourceWord, lang);
     let html = `<div class="dict-entry dict-entry-detail">`;
+
+    // Back button
+    html += `<button class="detail-back-btn" id="detail-back">\u2190 Back to results</button>`;
+
     html += `<div class="dict-entry-header">`;
     html += `  <div class="dict-word dict-word-lg">${_escapeHtml(sourceWord)}</div>`;
     html += `  <button class="share-btn" data-url="${_escapeHtml(shareUrl)}" title="Copy link" aria-label="Share">`;
@@ -528,10 +556,11 @@ const UI = (() => {
       html += `</div>`;
     }
 
-    // Related words section — like MyOrdbok's thesaurus
+    // Thesaurus / Related words section — grouped by POS like MyOrdbok
     if (data.related && data.related.length) {
       html += `<div class="dict-related">`;
-      html += `  <h3 class="dict-related-title">Related Words</h3>`;
+      html += `  <h3 class="dict-related-title">Thesaurus</h3>`;
+      html += `  <p class="dict-related-count">\u2014 ${data.related.length} word${data.related.length !== 1 ? 's' : ''} related to <em>${_escapeHtml(sourceWord)}</em></p>`;
       html += `  <div class="dict-related-list">`;
       data.related.forEach(w => {
         html += `<button class="dict-related-word" data-word="${_escapeHtml(w)}">${_escapeHtml(w)}</button>`;
@@ -540,10 +569,21 @@ const UI = (() => {
       html += `</div>`;
     }
 
-    // Contribute prompt — like MyOrdbok's "Help us shape the term"
+    // Contribute prompt — "Help us shape the term" like MyOrdbok
     html += `<div class="dict-contribute">`;
-    html += `  <p>Help us improve the definition of <strong>\u201c${_escapeHtml(sourceWord)}\u201d</strong>.</p>`;
-    html += `  <a href="https://docs.google.com/forms/d/e/1FAIpQLSceWwVrtH5KivCR3wuvKqMn8U238-aCxOJIIWs1gK4pt994oA/viewform" target="_blank" rel="noopener" class="contribute-link">\u270F\uFE0F Suggest improvement</a>`;
+    html += `  <h4 class="dict-contribute-title">Help us shape the term of \u201c${_escapeHtml(sourceWord)}\u201d</h4>`;
+    html += `  <p class="dict-contribute-text">The contribution always plays a crucial role in shaping the excellence of <strong>${_escapeHtml(sourceWord)}</strong>. By sharing your insights on it context using Google Forms such as,</p>`;
+    html += `  <ul class="dict-contribute-list">`;
+    html += `    <li>\u2026definition: meaning, translation</li>`;
+    html += `    <li>\u2026grammar: spelling, punctuation</li>`;
+    html += `    <li>\u2026example: when, where and how to use its</li>`;
+    html += `  </ul>`;
+    html += `  <p class="dict-contribute-text">\u2026its actively help us refine meaningful content and elevate the user experience.</p>`;
+    html += `  <p class="dict-contribute-text">We want you to know that your efforts are immensely appreciated and instrumental in making the dictionary even better.</p>`;
+    html += `  <div class="dict-contribute-actions">`;
+    html += `    <a href="https://docs.google.com/forms/d/e/1FAIpQLSceWwVrtH5KivCR3wuvKqMn8U238-aCxOJIIWs1gK4pt994oA/viewform" target="_blank" rel="noopener" class="contribute-link contribute-link-primary">\u270F\uFE0F Suggest improvement</a>`;
+    html += `    <a href="https://docs.google.com/forms/d/e/1FAIpQLSceWwVrtH5KivCR3wuvKqMn8U238-aCxOJIIWs1gK4pt994oA/viewform" target="_blank" rel="noopener" class="contribute-link">Your feedback on overall experiences is also highly welcome</a>`;
+    html += `  </div>`;
     html += `</div>`;
 
     html += `</div>`;
@@ -563,6 +603,14 @@ const UI = (() => {
         _executeSearch(btn.dataset.word, true);
       });
     });
+
+    // Wire back button
+    const backBtn = document.getElementById('detail-back');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        history.back();
+      });
+    }
 
     _clearStatus();
     $resultsCount.classList.remove('hidden');
