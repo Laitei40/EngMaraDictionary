@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="English ⇄ Mara Dictionary — fast, offline-capable word lookup">
+  <meta name="theme-color" content="#1a5276">
+  <title>English ⇄ Mara Dictionary</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <h1 class="logo">
+        <span class="logo-icon" aria-hidden="true">📖</span>
+        <span>English ⇄ Mara Dictionary</span>
+      </h1>
+      <div id="offline-badge" class="offline-badge hidden" role="status" aria-live="polite">
+        <span class="offline-dot"></span>
+        Offline mode
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="search-section" aria-label="Dictionary search">
+      <form id="search-form" class="search-form" role="search" autocomplete="off">
+        <div class="search-bar">
+          <label for="search-input" class="sr-only">Search for a word</label>
+          <input
+            id="search-input"
+            type="search"
+            class="search-input"
+            placeholder="Type a word…"
+            aria-label="Search for a word"
+            spellcheck="false"
+            autofocus
+          >
+          <button type="submit" class="search-btn" aria-label="Search">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
+        </div>
+        <div class="lang-toggle" role="radiogroup" aria-label="Search direction">
+          <button type="button" class="lang-btn active" data-lang="en" aria-pressed="true">
+            English → Mara
+          </button>
+          <button type="button" class="lang-btn" data-lang="mrh" aria-pressed="false">
+            Mara → English
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="results-section" aria-label="Search results" aria-live="polite">
+      <div id="status-message" class="status-message hidden"></div>
+      <div id="results-container" class="results-container"></div>
+    </section>
+
+    <section id="recent-section" class="recent-section hidden" aria-label="Recent searches">
+      <h2 class="section-title">Recent Searches</h2>
+      <ul id="recent-list" class="recent-list"></ul>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; 2026 English ⇄ Mara Dictionary Project</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

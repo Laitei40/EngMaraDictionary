@@ -1,0 +1,11 @@
+name = "mara-dictionary-api"
+main = "src/worker.js"
+compatibility_date = "2024-12-01"
+
+# ── D1 Database Binding ──
+# After creating your D1 database, paste the real database_id below.
+# Run:  npx wrangler d1 create mara-dictionary
+[[d1_databases]]
+binding = "DB"
+database_name = "engmaradata"
+database_id = "6659e51e-4542-414d-b386-150f92b18a67"
