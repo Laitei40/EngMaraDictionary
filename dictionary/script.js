@@ -15,8 +15,8 @@
 
 // ─── Config ──────────────────────────────────────────────────────────
 const Config = Object.freeze({
-  // Change this to your deployed Cloudflare Worker URL
-  API_BASE: 'http://localhost:8787',
+  // Deployed Cloudflare Worker URL
+  API_BASE: 'https://engmaradictionary.teiteipara.workers.dev',
 
   DEBOUNCE_MS:        300,
   CACHE_TTL_MS:       7 * 24 * 60 * 60 * 1000, // 7 days
