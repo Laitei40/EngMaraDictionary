@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="About MaraDict — the English ⇄ Mara (Lakher) online dictionary">
+  <meta name="theme-color" content="#ffffff">
+  <title>About — MaraDict</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Top Navigation ── -->
+  <nav class="topnav" role="navigation">
+    <div class="container topnav-inner">
+      <a href="/" class="topnav-brand">
+        <svg class="topnav-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+          <path d="M8 7h6"/><path d="M8 11h8"/>
+        </svg>
+        <span class="topnav-name">MaraDict</span>
+      </a>
+      <div class="topnav-links">
+        <a href="/" class="topnav-link">Home</a>
+        <a href="/about.html" class="topnav-link active">About</a>
+        <a href="https://github.com/Laitei40/EngMaraDictionary" class="topnav-link" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main Content ── -->
+  <main class="main">
+    <div class="container">
+
+      <article class="about-page">
+
+        <h1 class="about-heading">A comprehensive English ⇄ Mara dictionary</h1>
+
+        <p class="about-lead">
+          Discover and learn the <strong>Mara (Lakher)</strong> language through an online dictionary
+          that provides practical definitions, translations, and example sentences.
+          MaraDict is designed to preserve and promote the Mara language — a Kuki-Chin language
+          spoken primarily in Mizoram (India) and Chin State (Myanmar).
+        </p>
+
+        <!-- Stats Section — populated by JS -->
+        <section class="about-stats" id="about-stats">
+          <h2 class="about-section-title">Dictionary Statistics</h2>
+          <div class="stats-grid" id="stats-grid">
+            <div class="stat-card">
+              <span class="stat-value" id="stat-entries">—</span>
+              <span class="stat-label">Total Entries</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="stat-english">—</span>
+              <span class="stat-label">English Words</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="stat-mara">—</span>
+              <span class="stat-label">Mara Words</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="stat-definitions">—</span>
+              <span class="stat-label">With Definitions</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="stat-examples">—</span>
+              <span class="stat-label">With Examples</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="stat-pos">—</span>
+              <span class="stat-label">Word Types</span>
+            </div>
+          </div>
+
+          <!-- POS breakdown -->
+          <div class="pos-breakdown" id="pos-breakdown"></div>
+        </section>
+
+        <!-- Aim -->
+        <section class="about-section">
+          <h2 class="about-section-title">Aim &amp; Objective</h2>
+          <p>
+            The primary aim is to serve as an online dictionary, providing practical and meaningful
+            definitions for the Mara language. We are committed to continually expanding the
+            vocabulary, ensuring ease of use and relevance for all users across various devices.
+            Our goal is to make the dictionary accessible on all modern devices, catering to both
+            beginner and advanced learners.
+          </p>
+        </section>
+
+        <!-- How it works -->
+        <section class="about-section">
+          <h2 class="about-section-title">How It Works</h2>
+          <ul class="about-list">
+            <li><strong>Search</strong> — Type any English or Mara word. Results appear instantly as you type.</li>
+            <li><strong>Direction</strong> — Toggle between English → Mara and Mara → English.</li>
+            <li><strong>Browse</strong> — Explore words alphabetically using the A–Z browser.</li>
+            <li><strong>Shareable Links</strong> — Every word has a permanent link you can share.</li>
+            <li><strong>Offline Ready</strong> — Previously searched words are cached for offline access.</li>
+          </ul>
+        </section>
+
+        <!-- Contribute -->
+        <section class="about-section">
+          <h2 class="about-section-title">Contribute</h2>
+          <p>
+            To ensure that MaraDict continues to grow and provide comprehensive definitions, we
+            rely on contributions from the community. If you come across any errors, have new
+            words to suggest, or want to improve existing definitions, we welcome your input.
+          </p>
+          <div class="about-actions">
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSceWwVrtH5KivCR3wuvKqMn8U238-aCxOJIIWs1gK4pt994oA/viewform" 
+               class="about-btn" target="_blank" rel="noopener">
+              ✏️ Suggest a Word
+            </a>
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLScSyBRtQrEc1YGh3m0O96vy6YNlCtJZR5T6NIJ9hYJRfcnV2g/viewform" 
+               class="about-btn about-btn-outline" target="_blank" rel="noopener">
+              💬 Send Feedback
+            </a>
+          </div>
+        </section>
+
+        <!-- Note -->
+        <section class="about-section">
+          <h2 class="about-section-title">Note</h2>
+          <ul class="about-list about-list-plain">
+            <li>The dictionary data is continuously being collected and updated.</li>
+            <li>MaraDict is open-source. Source code is available on <a href="https://github.com/Laitei40/EngMaraDictionary" target="_blank" rel="noopener">GitHub</a>.</li>
+            <li>Built with Cloudflare Workers, D1, and Pages.</li>
+          </ul>
+        </section>
+
+      </article>
+
+    </div>
+  </main>
+
+  <!-- ── Footer ── -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <p class="footer-copy">&copy; 2026 MaraDict</p>
+      <div class="footer-links">
+        <a href="/about.html">About</a>
+        <span class="footer-dot">&middot;</span>
+        <a href="https://github.com/Laitei40/EngMaraDictionary" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Load stats from API
+    (async () => {
+      try {
+        const res = await fetch('https://engmaradictionary.teiteipara.workers.dev/api/stats');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        document.getElementById('stat-entries').textContent = data.total_entries?.toLocaleString() || '—';
+        document.getElementById('stat-english').textContent = data.unique_english?.toLocaleString() || '—';
+        document.getElementById('stat-mara').textContent = data.unique_mara?.toLocaleString() || '—';
+        document.getElementById('stat-definitions').textContent = data.with_definition?.toLocaleString() || '—';
+        document.getElementById('stat-examples').textContent = data.with_example?.toLocaleString() || '—';
+        document.getElementById('stat-pos').textContent = data.pos_count?.toLocaleString() || '—';
+
+        // POS breakdown
+        if (data.parts_of_speech && data.parts_of_speech.length) {
+          const container = document.getElementById('pos-breakdown');
+          container.innerHTML = '<h3 class="pos-title">Word Types Breakdown</h3>' +
+            data.parts_of_speech.map(p =>
+              `<div class="pos-row">
+                <span class="pos-name">${p.part_of_speech || 'unknown'}</span>
+                <span class="pos-bar"><span class="pos-bar-fill" style="width:${Math.round(p.count / data.total_entries * 100)}%"></span></span>
+                <span class="pos-count">${p.count}</span>
+              </div>`
+            ).join('');
+        }
+      } catch { /* stats unavailable */ }
+    })();
+  </script>
+</body>
+</html>
