@@ -263,6 +263,76 @@ const CookieConsent = (() => {
 })();
 
 
+// ─── Theme Toggle (Dark/Light Mode) ─────────────────────────────────
+const ThemeToggle = (() => {
+  const STORAGE_KEY = 'mara_dict_theme';
+
+  function _getPreferred() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return stored;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function _apply(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    // Update theme-color meta tag
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#0f172a' : '#2563eb';
+  }
+
+  function toggle() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    _apply(next);
+    localStorage.setItem(STORAGE_KEY, next);
+  }
+
+  function init() {
+    // Apply saved/preferred theme
+    _apply(_getPreferred());
+
+    // Wire toggle button
+    const btn = document.getElementById('theme-toggle');
+    if (btn) btn.addEventListener('click', toggle);
+
+    // Listen for OS-level theme changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        _apply(e.matches ? 'dark' : 'light');
+      }
+    });
+  }
+
+  return { init, toggle };
+})();
+
+
+// ─── Mobile Menu ─────────────────────────────────────────────────────
+const MobileMenu = (() => {
+  function init() {
+    const btn = document.getElementById('mobile-menu-btn');
+    const menu = document.getElementById('mobile-menu');
+    if (!btn || !menu) return;
+
+    btn.addEventListener('click', () => {
+      const isOpen = !menu.classList.contains('hidden');
+      menu.classList.toggle('hidden', isOpen);
+      btn.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.topnav')) {
+        menu.classList.add('hidden');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  return { init };
+})();
+
+
 // ─── UI ──────────────────────────────────────────────────────────────
 const UI = (() => {
   // DOM refs
@@ -993,6 +1063,8 @@ const App = (() => {
     }
 
     Network.init();
+    ThemeToggle.init();
+    MobileMenu.init();
     UI.init();
     CookieConsent.init();
   }
