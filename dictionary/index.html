@@ -3,70 +3,112 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="English ⇄ Mara Dictionary — fast, offline-capable word lookup">
-  <meta name="theme-color" content="#1a5276">
+  <meta name="description" content="English ⇄ Mara Dictionary — fast, offline-capable word lookup for the Mara (Lakher) language">
+  <meta name="theme-color" content="#0f172a">
   <title>English ⇄ Mara Dictionary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="header">
-    <div class="header-inner">
-      <h1 class="logo">
-        <span class="logo-icon" aria-hidden="true">📖</span>
-        <span>English ⇄ Mara Dictionary</span>
-      </h1>
-      <div id="offline-badge" class="offline-badge hidden" role="status" aria-live="polite">
-        <span class="offline-dot"></span>
-        Offline mode
+
+  <!-- ── Navbar ── -->
+  <nav class="navbar" role="navigation">
+    <div class="container navbar-inner">
+      <a href="/" class="navbar-brand" aria-label="Home">
+        <svg class="navbar-logo-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+          <path d="M8 7h6"/>
+          <path d="M8 11h8"/>
+        </svg>
+        <span class="navbar-title">Mara<span class="navbar-title-accent">Dict</span></span>
+      </a>
+      <div class="navbar-right">
+        <div id="offline-badge" class="badge badge-warning hidden" role="status" aria-live="polite">
+          <span class="badge-dot"></span>
+          Offline
+        </div>
+        <span class="navbar-subtitle">English ⇄ Mara</span>
       </div>
     </div>
-  </header>
+  </nav>
 
-  <main class="main">
-    <section class="search-section" aria-label="Dictionary search">
-      <form id="search-form" class="search-form" role="search" autocomplete="off">
+  <!-- ── Hero / Search Area ── -->
+  <header class="hero">
+    <div class="container">
+      <div class="hero-content">
+        <h1 class="hero-title">English ⇄ Mara Dictionary</h1>
+        <p class="hero-desc">Look up words and phrases in the Mara language — fast, reliable, and works offline.</p>
+      </div>
+
+      <form id="search-form" class="search-card" role="search" autocomplete="off">
         <div class="search-bar">
+          <div class="search-icon-wrap" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </div>
           <label for="search-input" class="sr-only">Search for a word</label>
           <input
             id="search-input"
             type="search"
             class="search-input"
-            placeholder="Type a word…"
+            placeholder="Search for a word or phrase…"
             aria-label="Search for a word"
             spellcheck="false"
             autofocus
           >
-          <button type="submit" class="search-btn" aria-label="Search">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="8"/>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
+          <button type="submit" class="btn btn-primary search-submit" aria-label="Search">
+            Search
           </button>
         </div>
         <div class="lang-toggle" role="radiogroup" aria-label="Search direction">
           <button type="button" class="lang-btn active" data-lang="en" aria-pressed="true">
-            English → Mara
+            <span class="lang-btn-label">English</span>
+            <svg class="lang-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            <span class="lang-btn-label">Mara</span>
           </button>
           <button type="button" class="lang-btn" data-lang="mrh" aria-pressed="false">
-            Mara → English
+            <span class="lang-btn-label">Mara</span>
+            <svg class="lang-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            <span class="lang-btn-label">English</span>
           </button>
         </div>
       </form>
-    </section>
+    </div>
+  </header>
 
-    <section class="results-section" aria-label="Search results" aria-live="polite">
-      <div id="status-message" class="status-message hidden"></div>
-      <div id="results-container" class="results-container"></div>
-    </section>
+  <!-- ── Main Content ── -->
+  <main class="main">
+    <div class="container">
 
-    <section id="recent-section" class="recent-section hidden" aria-label="Recent searches">
-      <h2 class="section-title">Recent Searches</h2>
-      <ul id="recent-list" class="recent-list"></ul>
-    </section>
+      <section class="results-section" aria-label="Search results" aria-live="polite">
+        <div id="status-message" class="alert hidden"></div>
+        <div id="results-count" class="results-meta hidden"></div>
+        <div id="results-container" class="results-grid"></div>
+      </section>
+
+      <section id="recent-section" class="recent-section hidden" aria-label="Recent searches">
+        <div class="section-header">
+          <h2 class="section-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Recent Searches
+          </h2>
+        </div>
+        <ul id="recent-list" class="recent-list"></ul>
+      </section>
+
+    </div>
   </main>
 
+  <!-- ── Footer ── -->
   <footer class="footer">
-    <p>&copy; 2026 English ⇄ Mara Dictionary Project</p>
+    <div class="container footer-inner">
+      <p class="footer-text">&copy; 2026 Mara Dictionary Project &mdash; Preserving the Mara language</p>
+      <p class="footer-meta">Built with care. No frameworks. No dependencies.</p>
+    </div>
   </footer>
 
   <script src="script.js"></script>

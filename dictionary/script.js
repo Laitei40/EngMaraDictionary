@@ -259,6 +259,7 @@ const UI = (() => {
   const $searchInput     = document.getElementById('search-input');
   const $searchForm      = document.getElementById('search-form');
   const $resultsContainer= document.getElementById('results-container');
+  const $resultsCount    = document.getElementById('results-count');
   const $statusMessage   = document.getElementById('status-message');
   const $offlineBadge    = document.getElementById('offline-badge');
   const $recentSection   = document.getElementById('recent-section');
@@ -273,13 +274,14 @@ const UI = (() => {
 
   function _setStatus(text, type = 'info') {
     $statusMessage.textContent = text;
-    $statusMessage.className = `status-message ${type}`;
+    $statusMessage.className = `alert ${type}`;
     $statusMessage.classList.remove('hidden');
   }
 
   function _clearStatus() {
     $statusMessage.classList.add('hidden');
     $statusMessage.textContent = '';
+    $resultsCount.classList.add('hidden');
   }
 
   function _showLoading() {
@@ -289,21 +291,27 @@ const UI = (() => {
   }
 
   function _renderEmpty(query) {
+    $resultsCount.classList.add('hidden');
     $resultsContainer.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">🔍</div>
-        <div class="empty-state-text">No results found for "<strong>${_escapeHtml(query)}</strong>"</div>
-        <div class="empty-state-hint">Try a different spelling or search direction.</div>
+        <div class="empty-state-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </div>
+        <div class="empty-state-text">No results for \u201c${_escapeHtml(query)}\u201d</div>
+        <div class="empty-state-hint">Check your spelling or try searching in the other direction.</div>
       </div>
     `;
   }
 
   function _renderWelcome() {
+    $resultsCount.classList.add('hidden');
     $resultsContainer.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">📖</div>
-        <div class="empty-state-text">Search the English ⇄ Mara Dictionary</div>
-        <div class="empty-state-hint">Start typing a word above to look it up.</div>
+        <div class="empty-state-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M8 7h6"/><path d="M8 11h8"/></svg>
+        </div>
+        <div class="empty-state-text">Start searching</div>
+        <div class="empty-state-hint">Type an English or Mara word above to find its translation.</div>
       </div>
     `;
   }
@@ -312,39 +320,35 @@ const UI = (() => {
     if (!results.length) return;
 
     const isEnToMara = lang === 'en';
+
+    // Show result count
+    const countText = results.length === 1 ? '1 result' : `${results.length} results`;
+    $resultsCount.textContent = countText;
+    $resultsCount.classList.remove('hidden');
+
     const html = results.map((entry) => {
       const sourceWord = isEnToMara ? entry.english_word : entry.mara_word;
       const targetWord = isEnToMara ? entry.mara_word : entry.english_word;
       const targetLabel = isEnToMara ? 'Mara' : 'English';
 
-      let cardBody = '';
-
-      // Part of speech
-      if (entry.part_of_speech) {
-        cardBody += `<span class="result-pos">${_escapeHtml(entry.part_of_speech)}</span>`;
-      }
-
-      cardBody = `
+      let cardBody = `
         <div class="result-header">
           <span class="result-word">${_escapeHtml(sourceWord)}</span>
           ${entry.part_of_speech ? `<span class="result-pos">${_escapeHtml(entry.part_of_speech)}</span>` : ''}
         </div>
-        <div class="result-label">${targetLabel}</div>
-        <div class="result-translation">${_escapeHtml(targetWord)}</div>
+        <hr class="result-divider">
+        <div class="result-translation-wrap">
+          <span class="result-label">${targetLabel}</span>
+          <span class="result-translation">${_escapeHtml(targetWord)}</span>
+        </div>
       `;
 
       if (entry.definition) {
-        cardBody += `
-          <div class="result-label">Definition</div>
-          <div class="result-definition">${_escapeHtml(entry.definition)}</div>
-        `;
+        cardBody += `<div class="result-definition">${_escapeHtml(entry.definition)}</div>`;
       }
 
       if (entry.example_sentence) {
-        cardBody += `
-          <div class="result-label">Example</div>
-          <div class="result-example">"${_escapeHtml(entry.example_sentence)}"</div>
-        `;
+        cardBody += `<div class="result-example">\u201c${_escapeHtml(entry.example_sentence)}\u201d</div>`;
       }
 
       return `<article class="result-card">${cardBody}</article>`;
@@ -353,9 +357,11 @@ const UI = (() => {
     $resultsContainer.innerHTML = html;
 
     if (fromCache) {
-      _setStatus('Showing cached results — you appear to be offline.', 'cache-notice');
+      _setStatus('Showing cached results \u2014 you appear to be offline.', 'cache-notice');
     } else {
       _clearStatus();
+      // Keep count visible
+      $resultsCount.classList.remove('hidden');
     }
   }
 
