@@ -1,7 +1,7 @@
 /**
  * English ⇄ Mara Dictionary — Cloudflare Worker API
  *
- * Endpoints:
+ * Public Endpoints:
  *   GET /api/search?q=<query>&lang=en|mrh          — Dictionary search
  *   GET /api/suggest?q=<prefix>&lang=en|mrh         — Autocomplete suggestions
  *   GET /api/word?q=<word>&lang=en|mrh              — Exact word lookup (definition page)
@@ -9,7 +9,16 @@
  *   GET /api/stats                                  — Dictionary statistics
  *   GET /api/health                                 — Health check
  *
+ * Admin CRUD Endpoints (protected by Cloudflare Access):
+ *   GET    /api/admin/entries?page=1&q=<filter>     — List all entries (paginated)
+ *   POST   /api/admin/entries                       — Create a new entry
+ *   PUT    /api/admin/entries/:id                   — Update an existing entry
+ *   DELETE /api/admin/entries/:id                   — Delete an entry
+ *
  * Binds to a Cloudflare D1 database named DB.
+ * Set the ADMIN_KEY secret:  npx wrangler secret put ADMIN_KEY
+ *
+ * Authentication for admin routes is handled by Cloudflare Access.
  */
 
 export default {
@@ -19,7 +28,7 @@ export default {
     // CORS headers for all responses
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, HEAD, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '86400',
     };
@@ -29,7 +38,12 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    // Only allow GET and HEAD
+    // Admin CRUD routes — skip the GET-only guard for /api/admin/*
+    if (url.pathname.startsWith('/api/admin/')) {
+      return await handleAdmin(request, url, env, corsHeaders);
+    }
+
+    // Only allow GET and HEAD for public routes
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
     }
@@ -365,6 +379,163 @@ async function handleStats(db, corsHeaders) {
   } catch (err) {
     return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
   }
+}
+
+/**
+ * ─────────────────────────────────────────────
+ * Admin CRUD handler — routes to sub-handlers.
+ * All routes require the X-Admin-Key header.
+ * ─────────────────────────────────────────────
+ */
+async function handleAdmin(request, url, env, corsHeaders) {
+  const db = env.DB;
+  const method = request.method;
+
+  // GET /api/admin/entries — list all entries (paginated + optional filter)
+  if (url.pathname === '/api/admin/entries' && method === 'GET') {
+    const page    = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+    const perPage = Math.min(100, Math.max(1, parseInt(url.searchParams.get('per_page') || '50', 10)));
+    const offset  = (page - 1) * perPage;
+    const q       = (url.searchParams.get('q') || '').trim();
+    const lang    = (url.searchParams.get('lang') || '').toLowerCase();
+
+    try {
+      let whereClause = '';
+      let bindings = [];
+
+      if (q) {
+        const pattern = `%${q.toLowerCase()}%`;
+        if (lang === 'mrh') {
+          whereClause = 'WHERE LOWER(mara_word) LIKE ?1';
+          bindings = [pattern];
+        } else {
+          whereClause = 'WHERE LOWER(english_word) LIKE ?1 OR LOWER(mara_word) LIKE ?1';
+          bindings = [pattern];
+        }
+      }
+
+      const countResult = await db.prepare(
+        `SELECT COUNT(*) AS total FROM dictionary ${whereClause}`
+      ).bind(...bindings).first();
+      const total = countResult?.total || 0;
+
+      // Append pagination bindings
+      const paginationBindings = [...bindings, perPage, offset];
+      const limitIndex = bindings.length + 1;
+      const { results } = await db.prepare(
+        `SELECT id, english_word, mara_word, part_of_speech, definition, example_sentence, created_at
+         FROM dictionary
+         ${whereClause}
+         ORDER BY id DESC
+         LIMIT ?${limitIndex} OFFSET ?${limitIndex + 1}`
+      ).bind(...paginationBindings).all();
+
+      return jsonResponse({
+        page, perPage, total,
+        totalPages: Math.ceil(total / perPage),
+        results,
+      }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
+  // POST /api/admin/entries — create a new entry
+  if (url.pathname === '/api/admin/entries' && method === 'POST') {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400, corsHeaders);
+    }
+
+    const { english_word, mara_word, part_of_speech, definition, example_sentence } = body;
+    if (!english_word || !mara_word) {
+      return jsonResponse({ error: 'english_word and mara_word are required' }, 400, corsHeaders);
+    }
+
+    try {
+      const result = await db.prepare(
+        `INSERT INTO dictionary (english_word, mara_word, part_of_speech, definition, example_sentence)
+         VALUES (?1, ?2, ?3, ?4, ?5)`
+      ).bind(
+        english_word.trim(),
+        mara_word.trim(),
+        part_of_speech?.trim() || null,
+        definition?.trim() || null,
+        example_sentence?.trim() || null,
+      ).run();
+
+      const created = await db.prepare(
+        'SELECT * FROM dictionary WHERE id = ?1'
+      ).bind(result.meta.last_row_id).first();
+
+      return jsonResponse({ success: true, entry: created }, 201, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
+  // PUT /api/admin/entries/:id — update an entry
+  const putMatch = url.pathname.match(/^\/api\/admin\/entries\/(\d+)$/);
+  if (putMatch && method === 'PUT') {
+    const id = parseInt(putMatch[1], 10);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400, corsHeaders);
+    }
+
+    const { english_word, mara_word, part_of_speech, definition, example_sentence } = body;
+    if (!english_word || !mara_word) {
+      return jsonResponse({ error: 'english_word and mara_word are required' }, 400, corsHeaders);
+    }
+
+    try {
+      const existing = await db.prepare('SELECT id FROM dictionary WHERE id = ?1').bind(id).first();
+      if (!existing) {
+        return jsonResponse({ error: 'Entry not found' }, 404, corsHeaders);
+      }
+
+      await db.prepare(
+        `UPDATE dictionary
+         SET english_word = ?1, mara_word = ?2, part_of_speech = ?3,
+             definition = ?4, example_sentence = ?5
+         WHERE id = ?6`
+      ).bind(
+        english_word.trim(),
+        mara_word.trim(),
+        part_of_speech?.trim() || null,
+        definition?.trim() || null,
+        example_sentence?.trim() || null,
+        id,
+      ).run();
+
+      const updated = await db.prepare('SELECT * FROM dictionary WHERE id = ?1').bind(id).first();
+      return jsonResponse({ success: true, entry: updated }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
+  // DELETE /api/admin/entries/:id — delete an entry
+  const deleteMatch = url.pathname.match(/^\/api\/admin\/entries\/(\d+)$/);
+  if (deleteMatch && method === 'DELETE') {
+    const id = parseInt(deleteMatch[1], 10);
+    try {
+      const existing = await db.prepare('SELECT id FROM dictionary WHERE id = ?1').bind(id).first();
+      if (!existing) {
+        return jsonResponse({ error: 'Entry not found' }, 404, corsHeaders);
+      }
+      await db.prepare('DELETE FROM dictionary WHERE id = ?1').bind(id).run();
+      return jsonResponse({ success: true, deleted_id: id }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
+  return jsonResponse({ error: 'Admin route not found' }, 404, corsHeaders);
 }
 
 /**

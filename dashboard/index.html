@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Developer Dashboard — MaraDict</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    (function(){
+      var t = localStorage.getItem('mara_dict_theme');
+      if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+  <style>
+    /* ── Design tokens ── */
+    :root, [data-theme="light"] {
+      --bg: #f8fafc; --bg-elevated: #ffffff; --bg-subtle: #f1f5f9; --bg-inset: #e2e8f0;
+      --surface: #ffffff; --surface-hover: #f8fafc;
+      --border: #e2e8f0; --border-light: #f1f5f9; --border-focus: #2563eb;
+      --text: #0f172a; --text-2: #475569; --text-3: #94a3b8; --text-inverse: #ffffff;
+      --accent: #2563eb; --accent-hover: #1d4ed8; --accent-subtle: #eff6ff; --accent-muted: #dbeafe;
+      --green: #059669; --green-bg: #ecfdf5; --orange: #d97706; --orange-bg: #fffbeb;
+      --red: #dc2626; --red-bg: #fef2f2; --red-hover: #b91c1c;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.04);
+      --shadow-xl: 0 20px 25px -5px rgba(0,0,0,.08), 0 8px 10px -6px rgba(0,0,0,.04);
+      --nav-bg: rgba(255,255,255,.85); --nav-border: rgba(226,232,240,.8);
+      --ring: 0 0 0 3px rgba(37,99,235,.15); --transition: .2s cubic-bezier(.4,0,.2,1);
+      --header-bg: linear-gradient(135deg,#1e40af 0%,#2563eb 50%,#3b82f6 100%);
+    }
+    [data-theme="dark"] {
+      --bg: #0f172a; --bg-elevated: #1e293b; --bg-subtle: #1e293b; --bg-inset: #0f172a;
+      --surface: #1e293b; --surface-hover: #334155;
+      --border: #334155; --border-light: #1e293b; --border-focus: #60a5fa;
+      --text: #f1f5f9; --text-2: #94a3b8; --text-3: #64748b; --text-inverse: #0f172a;
+      --accent: #60a5fa; --accent-hover: #93bbfd; --accent-subtle: rgba(96,165,250,.1); --accent-muted: rgba(96,165,250,.15);
+      --green: #34d399; --green-bg: rgba(52,211,153,.1); --orange: #fbbf24; --orange-bg: rgba(251,191,36,.1);
+      --red: #f87171; --red-bg: rgba(248,113,113,.1); --red-hover: #ef4444;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,.4), 0 2px 4px -2px rgba(0,0,0,.3);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.4), 0 4px 6px -4px rgba(0,0,0,.3);
+      --shadow-xl: 0 20px 25px -5px rgba(0,0,0,.5), 0 8px 10px -6px rgba(0,0,0,.3);
+      --nav-bg: rgba(15,23,42,.9); --nav-border: rgba(51,65,85,.8);
+      --ring: 0 0 0 3px rgba(96,165,250,.2);
+      --header-bg: linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#1e40af 100%);
+    }
+    :root {
+      --font: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px; --radius-full: 9999px;
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { font-size:16px; scroll-behavior:smooth; color-scheme: light dark; }
+    body { font-family:var(--font); background:var(--bg); color:var(--text); line-height:1.6; min-height:100vh; }
+    button, input, select, textarea { font-family:inherit; }
+    a { color:var(--accent); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+
+    /* ── Topnav ── */
+    .topnav {
+      position:sticky; top:0; z-index:100;
+      background:var(--nav-bg); border-bottom:1px solid var(--nav-border);
+      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    }
+    .topnav-inner { max-width:1280px; margin:0 auto; padding:0 1.5rem; display:flex; align-items:center; justify-content:space-between; height:56px; }
+    .topnav-brand { display:flex; align-items:center; gap:.625rem; font-weight:700; font-size:1.05rem; color:var(--text); text-decoration:none; user-select:none; }
+    .topnav-logo { width:32px; height:32px; background:var(--accent); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; }
+    .topnav-badge { background:var(--orange-bg); color:var(--orange); border:1px solid var(--orange); font-size:.65rem; font-weight:700; padding:.1rem .45rem; border-radius:var(--radius-full); letter-spacing:.04em; text-transform:uppercase; }
+    .theme-toggle { width:36px; height:36px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all var(--transition); }
+    .theme-toggle:hover { background:var(--bg-subtle); color:var(--text); }
+    .theme-icon-moon { display:none; }
+    [data-theme="dark"] .theme-icon-sun { display:none; }
+    [data-theme="dark"] .theme-icon-moon { display:block; }
+
+    /* ── Page header ── */
+    .page-header { background:var(--header-bg); padding:2rem 0 1.75rem; }
+    .page-header .container { max-width:1280px; margin:0 auto; padding:0 1.5rem; }
+    .page-header h1 { font-size:1.75rem; font-weight:800; color:#fff; margin-bottom:.25rem; }
+    .page-header p { color:rgba(255,255,255,.75); font-size:.9rem; }
+
+    /* ── Layout ── */
+    .container { max-width:1280px; margin:0 auto; padding:0 1.5rem; }
+    .main-content { padding:1.75rem 0 4rem; }
+
+    /* ── Stats grid ── */
+    .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.75rem; }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:1.25rem 1.375rem; }
+    .stat-label { font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); margin-bottom:.375rem; }
+    .stat-value { font-size:1.75rem; font-weight:800; color:var(--text); line-height:1; }
+    .stat-sub { font-size:.78rem; color:var(--text-3); margin-top:.3rem; }
+    .stat-card.accent .stat-value { color:var(--accent); }
+    .stat-card.green .stat-value { color:var(--green); }
+    .stat-card.orange .stat-value { color:var(--orange); }
+
+    /* ── Toolbar ── */
+    .toolbar { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:1rem 1.25rem; margin-bottom:1rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+    .search-wrap { flex:1; min-width:220px; position:relative; }
+    .search-wrap svg { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); color:var(--text-3); pointer-events:none; }
+    .search-input { width:100%; padding:.55rem .75rem .55rem 2.25rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-subtle); color:var(--text); font-size:.875rem; transition:all var(--transition); }
+    .search-input:focus { outline:none; border-color:var(--border-focus); box-shadow:var(--ring); background:var(--surface); }
+    .lang-select { padding:.55rem .75rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-subtle); color:var(--text); font-size:.875rem; cursor:pointer; transition:all var(--transition); }
+    .lang-select:focus { outline:none; border-color:var(--border-focus); box-shadow:var(--ring); }
+
+    /* ── Buttons ── */
+    .btn { display:inline-flex; align-items:center; gap:.4rem; padding:.55rem 1.1rem; border-radius:var(--radius-sm); font-size:.875rem; font-weight:600; cursor:pointer; border:none; transition:all var(--transition); white-space:nowrap; }
+    .btn:active { transform:scale(.97); }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-primary:hover { background:var(--accent-hover); }
+    .btn-danger { background:var(--red); color:#fff; }
+    .btn-danger:hover { background:var(--red-hover); }
+    .btn-ghost { background:transparent; color:var(--text-2); border:1px solid var(--border); }
+    .btn-ghost:hover { background:var(--bg-subtle); color:var(--text); }
+    .btn-icon { padding:.45rem; width:32px; height:32px; border-radius:var(--radius-sm); background:transparent; border:1px solid var(--border); color:var(--text-2); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:all var(--transition); }
+    .btn-icon:hover { background:var(--bg-subtle); color:var(--text); }
+    .btn-icon.edit:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-subtle); }
+    .btn-icon.delete:hover { border-color:var(--red); color:var(--red); background:var(--red-bg); }
+    .btn:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+
+    /* ── Table ── */
+    .table-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:.875rem; }
+    thead { background:var(--bg-subtle); }
+    th { padding:.75rem 1rem; text-align:left; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); white-space:nowrap; border-bottom:1px solid var(--border); }
+    td { padding:.75rem 1rem; border-bottom:1px solid var(--border-light); vertical-align:middle; color:var(--text); }
+    tr:last-child td { border-bottom:none; }
+    tbody tr:hover { background:var(--surface-hover); }
+    .td-en { font-weight:600; }
+    .td-mrh { color:var(--accent); font-weight:500; }
+    .td-pos .pos-badge { display:inline-block; padding:.15rem .55rem; border-radius:var(--radius-full); font-size:.7rem; font-weight:600; background:var(--accent-muted); color:var(--accent); }
+    .td-def { max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-2); font-size:.82rem; }
+    .td-id { color:var(--text-3); font-size:.78rem; font-variant-numeric:tabular-nums; }
+    .td-actions { white-space:nowrap; display:flex; gap:.375rem; }
+
+    /* ── Pagination ── */
+    .pagination { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-top:1px solid var(--border); font-size:.825rem; color:var(--text-2); flex-wrap:wrap; gap:.5rem; }
+    .pag-controls { display:flex; align-items:center; gap:.375rem; }
+    .pag-btn { padding:.35rem .7rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text-2); cursor:pointer; font-size:.8rem; transition:all var(--transition); }
+    .pag-btn:hover:not(:disabled) { background:var(--bg-subtle); color:var(--text); }
+    .pag-btn:disabled { opacity:.4; cursor:not-allowed; }
+    .pag-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+    /* ── Empty / loading states ── */
+    .table-empty { text-align:center; padding:3.5rem 1rem; color:var(--text-3); }
+    .table-empty svg { margin-bottom:.75rem; opacity:.4; }
+    .table-empty p { font-size:.9rem; }
+    .skeleton { animation:pulse 1.5s ease-in-out infinite; background:var(--bg-inset); border-radius:4px; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* ── Fields ── */
+    .field { margin-bottom:1.1rem; }
+    .field label { display:block; font-size:.8rem; font-weight:600; margin-bottom:.4rem; color:var(--text-2); }
+    .field input, .field select, .field textarea {
+      width:100%; padding:.6rem .8rem; border:1px solid var(--border); border-radius:var(--radius-sm);
+      background:var(--bg-subtle); color:var(--text); font-size:.875rem; transition:all var(--transition);
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { outline:none; border-color:var(--border-focus); box-shadow:var(--ring); background:var(--surface); }
+    .field textarea { resize:vertical; min-height:80px; }
+    .field-row { display:grid; grid-template-columns:1fr 1fr; gap:.875rem; }
+    .field-required { color:var(--red); }
+    .field-hint { font-size:.75rem; color:var(--text-3); margin-top:.3rem; }
+
+    /* ── Modal ── */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:500; display:flex; align-items:center; justify-content:center; padding:1rem; opacity:0; pointer-events:none; transition:opacity var(--transition); }
+    .modal-overlay.open { opacity:1; pointer-events:auto; }
+    .modal { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-xl); width:100%; max-width:540px; max-height:90vh; overflow-y:auto; transform:translateY(16px) scale(.98); transition:transform .2s cubic-bezier(.34,1.56,.64,1); }
+    .modal-overlay.open .modal { transform:translateY(0) scale(1); }
+    .modal-header { padding:1.375rem 1.5rem 0; display:flex; align-items:flex-start; justify-content:space-between; }
+    .modal-header h3 { font-size:1.1rem; font-weight:700; }
+    .modal-close { width:30px; height:30px; border-radius:var(--radius-sm); border:none; background:transparent; color:var(--text-3); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all var(--transition); flex-shrink:0; }
+    .modal-close:hover { background:var(--bg-subtle); color:var(--text); }
+    .modal-body { padding:1.25rem 1.5rem; }
+    .modal-footer { padding:0 1.5rem 1.5rem; display:flex; justify-content:flex-end; gap:.625rem; border-top:1px solid var(--border); padding-top:1.125rem; margin-top:.25rem; }
+    .modal-error { background:var(--red-bg); color:var(--red); border:1px solid var(--red); border-radius:var(--radius-sm); padding:.55rem .8rem; font-size:.82rem; margin-bottom:1rem; display:none; }
+
+    /* ── Confirm dialog ── */
+    .confirm-modal { max-width:380px; }
+    .confirm-body { padding:1.25rem 1.5rem; }
+    .confirm-body p { color:var(--text-2); font-size:.9rem; margin-top:.5rem; }
+    .confirm-word { font-weight:700; color:var(--text); }
+
+    /* ── Toast ── */
+    .toast-wrap { position:fixed; bottom:1.5rem; right:1.5rem; z-index:600; display:flex; flex-direction:column; gap:.5rem; }
+    .toast { display:flex; align-items:center; gap:.625rem; padding:.75rem 1.1rem; border-radius:var(--radius-md); font-size:.85rem; font-weight:500; box-shadow:var(--shadow-lg); background:var(--surface); border:1px solid var(--border); min-width:240px; animation:slideUp .25s ease; }
+    .toast.success { background:var(--green-bg); border-color:var(--green); color:var(--green); }
+    .toast.error { background:var(--red-bg); border-color:var(--red); color:var(--red); }
+    @keyframes slideUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ── API URL chip ── */
+    .api-chip { display:flex; align-items:center; gap:.4rem; padding:.3rem .6rem .3rem .75rem; border:1px solid var(--border); border-radius:var(--radius-full); font-size:.75rem; color:var(--text-2); background:var(--bg-subtle); cursor:default; max-width:220px; overflow:hidden; }
+    .api-chip-url { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-variant-numeric:tabular-nums; }
+    .api-chip-btn { flex-shrink:0; width:18px; height:18px; display:flex; align-items:center; justify-content:center; border:none; background:none; color:var(--text-3); cursor:pointer; border-radius:3px; padding:0; }
+    .api-chip-btn:hover { color:var(--accent); }
+    .api-chip.unset { color:var(--red); border-color:var(--red); background:var(--red-bg); cursor:pointer; }
+
+    /* ── URL modal ── */
+    .url-modal { max-width:400px; }
+
+    /* ── Responsive ── */
+    @media (max-width:640px) {
+      .stats-grid { grid-template-columns:1fr 1fr; }
+      .field-row { grid-template-columns:1fr; }
+      table { font-size:.8rem; }
+      .api-chip { max-width:130px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Topnav ── -->
+  <nav class="topnav">
+    <div class="topnav-inner">
+      <div class="topnav-brand">
+        <div class="topnav-logo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+          </svg>
+        </div>
+        <span>MaraDict</span>
+        <span class="topnav-badge">Dev</span>
+      </div>
+      <div id="api-chip" class="api-chip unset" title="Set API URL">
+        <span class="api-chip-url" id="api-chip-label">No API URL set</span>
+        <button class="api-chip-btn" id="api-chip-edit" aria-label="Edit API URL">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+      </div>
+      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode">
+        <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── Dashboard ── -->
+  <div id="dashboard">
+    <div class="page-header">
+      <div class="container">
+        <h1>Developer Dashboard</h1>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="container">
+
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="stat-card accent">
+            <div class="stat-label">Total Entries</div>
+            <div class="stat-value skeleton" style="width:60px;height:2rem" id="stat-total">&nbsp;</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Unique English</div>
+            <div class="stat-value skeleton" style="width:50px;height:2rem" id="stat-en">&nbsp;</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-label">Unique Mara</div>
+            <div class="stat-value skeleton" style="width:50px;height:2rem" id="stat-mrh">&nbsp;</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">With Definition</div>
+            <div class="stat-value skeleton" style="width:50px;height:2rem" id="stat-def">&nbsp;</div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-label">With Example</div>
+            <div class="stat-value skeleton" style="width:50px;height:2rem" id="stat-ex">&nbsp;</div>
+          </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="search-input" class="search-input" type="search" placeholder="Filter entries…">
+          </div>
+          <select id="lang-select" class="lang-select" title="Filter language">
+            <option value="">All languages</option>
+            <option value="en">English</option>
+            <option value="mrh">Mara</option>
+          </select>
+          <button class="btn btn-primary" id="add-entry-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Entry
+          </button>
+          <button class="btn btn-ghost" id="refresh-btn" title="Refresh">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Refresh
+          </button>
+        </div>
+
+        <!-- Table -->
+        <div class="table-card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:56px">ID</th>
+                  <th>English</th>
+                  <th>Mara</th>
+                  <th>POS</th>
+                  <th>Definition</th>
+                  <th>Example</th>
+                  <th style="width:90px">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="entries-tbody">
+                <tr><td colspan="7">
+                  <div class="table-empty">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <p>Loading entries…</p>
+                  </div>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination" id="pagination"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── API URL Modal ── -->
+  <div class="modal-overlay" id="url-modal" role="dialog" aria-modal="true" aria-labelledby="url-modal-title">
+    <div class="modal url-modal">
+      <div class="modal-header">
+        <h3 id="url-modal-title">API Base URL</h3>
+        <button class="modal-close" id="url-modal-close" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label for="input-api-url">Worker URL</label>
+          <input id="input-api-url" type="url" placeholder="https://your-worker.workers.dev" autocomplete="off" spellcheck="false">
+          <span class="field-hint">No trailing slash. Leave empty to use the same origin.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="url-modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="url-modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Entry Form Modal ── -->
+  <div class="modal-overlay" id="form-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">Add Entry</h3>
+        <button class="modal-close" id="form-modal-close" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-error" id="form-error"></div>
+        <input type="hidden" id="form-entry-id">
+        <div class="field-row">
+          <div class="field">
+            <label for="f-english">English Word <span class="field-required">*</span></label>
+            <input id="f-english" type="text" placeholder="e.g. water">
+          </div>
+          <div class="field">
+            <label for="f-mara">Mara Word <span class="field-required">*</span></label>
+            <input id="f-mara" type="text" placeholder="e.g. tui">
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-pos">Part of Speech</label>
+          <select id="f-pos">
+            <option value="">— select —</option>
+            <option value="noun">noun</option>
+            <option value="verb">verb</option>
+            <option value="adjective">adjective</option>
+            <option value="adverb">adverb</option>
+            <option value="phrase">phrase</option>
+            <option value="interjection">interjection</option>
+            <option value="number">number</option>
+            <option value="particle">particle</option>
+            <option value="pronoun">pronoun</option>
+            <option value="conjunction">conjunction</option>
+            <option value="preposition">preposition</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-definition">Definition</label>
+          <textarea id="f-definition" placeholder="Short definition or meaning…"></textarea>
+        </div>
+        <div class="field">
+          <label for="f-example">Example Sentence</label>
+          <textarea id="f-example" placeholder="An example sentence showing usage…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="form-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="form-submit-btn">Save Entry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Delete Confirm Modal ── -->
+  <div class="modal-overlay" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="modal confirm-modal">
+      <div class="modal-header">
+        <h3 id="confirm-title">Delete Entry</h3>
+        <button class="modal-close" id="confirm-modal-close" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="confirm-body">
+        <p>Are you sure you want to permanently delete <span class="confirm-word" id="confirm-word-label"></span>? This cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="confirm-cancel-btn">Cancel</button>
+        <button class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Toasts ── -->
+  <div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
+
+  <script>
+  /* ================================================================
+     MaraDict Developer Dashboard — CRUD Client
+  ================================================================ */
+
+  // ── Config ─────────────────────────────────────────────────────
+  const STORE_API_URL = 'mara_api_url';
+  const DEFAULT_API_URL = 'https://engmaradictionary.workers.dev';
+  let API_URL = (localStorage.getItem(STORE_API_URL) || DEFAULT_API_URL).replace(/\/$/, '');
+
+  function applyApiUrl(url) {
+    API_URL = url.replace(/\/$/, '');
+    localStorage.setItem(STORE_API_URL, API_URL);
+    const chip = document.getElementById('api-chip');
+    const label = document.getElementById('api-chip-label');
+    if (API_URL) {
+      label.textContent = API_URL.replace(/^https?:\/\//, '');
+      chip.classList.remove('unset');
+      chip.title = API_URL;
+    } else {
+      label.textContent = 'No API URL set';
+      chip.classList.add('unset');
+      chip.title = 'Set API URL';
+    }
+  }
+
+  // Apply saved URL on load
+  applyApiUrl(API_URL);
+
+  // ── State ──────────────────────────────────────────────────────
+  const state = {
+    page: 1,
+    perPage: 50,
+    query: '',
+    lang: '',
+    totalPages: 1,
+    total: 0,
+    searchTimer: null,
+    deletingId: null,
+    editingId: null,
+  };
+
+  // ── API client ─────────────────────────────────────────────────
+  async function api(path, options = {}) {
+    const res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  // ── Toast ──────────────────────────────────────────────────────
+  function toast(msg, type = 'success') {
+    const wrap = document.getElementById('toast-wrap');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    wrap.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  // ── API URL modal ───────────────────────────────────────────────
+  function openUrlModal() {
+    document.getElementById('input-api-url').value = API_URL;
+    openModal('url-modal');
+    setTimeout(() => document.getElementById('input-api-url').focus(), 50);
+  }
+  document.getElementById('api-chip').addEventListener('click', e => {
+    if (e.target.closest('#api-chip')) openUrlModal();
+  });
+  document.getElementById('url-modal-close').addEventListener('click', () => closeModal('url-modal'));
+  document.getElementById('url-modal-cancel').addEventListener('click', () => closeModal('url-modal'));
+  document.getElementById('url-modal-save').addEventListener('click', () => {
+    const val = document.getElementById('input-api-url').value.trim();
+    applyApiUrl(val);
+    closeModal('url-modal');
+    loadStats();
+    loadEntries();
+  });
+  document.getElementById('input-api-url').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('url-modal-save').click();
+  });
+
+  // ── Theme ──────────────────────────────────────────────────────
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('mara_dict_theme', next);
+  });
+
+  // ── Stats ──────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const data = await fetch(`${API_URL}/api/stats`).then(r => r.json());
+      const set = (id, val) => {
+        const el = document.getElementById(id);
+        el.classList.remove('skeleton');
+        el.style.width = '';
+        el.style.height = '';
+        el.textContent = typeof val === 'number' ? val.toLocaleString() : (val ?? '—');
+      };
+      set('stat-total', data.total_entries);
+      set('stat-en', data.unique_english);
+      set('stat-mrh', data.unique_mara);
+      set('stat-def', data.with_definition);
+      set('stat-ex', data.with_example);
+    } catch (_) { /* non-critical */ }
+  }
+
+  // ── Entries table ──────────────────────────────────────────────
+  async function loadEntries() {
+    const tbody = document.getElementById('entries-tbody');
+    tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <p>Loading…</p></div></td></tr>`;
+
+    const params = new URLSearchParams({
+      page: state.page,
+      per_page: state.perPage,
+      ...(state.query ? { q: state.query } : {}),
+      ...(state.lang ? { lang: state.lang } : {}),
+    });
+
+    try {
+      const data = await api(`/api/admin/entries?${params}`);
+      state.totalPages = data.totalPages || 1;
+      state.total = data.total || 0;
+      renderTable(data.results || []);
+      renderPagination();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <p>Error: ${escHtml(err.message)}</p></div></td></tr>`;
+    }
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderTable(rows) {
+    const tbody = document.getElementById('entries-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <p>No entries found.</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr data-id="${r.id}">
+        <td class="td-id">${r.id}</td>
+        <td class="td-en">${escHtml(r.english_word)}</td>
+        <td class="td-mrh">${escHtml(r.mara_word)}</td>
+        <td class="td-pos">${r.part_of_speech ? `<span class="pos-badge">${escHtml(r.part_of_speech)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td class="td-def" title="${escHtml(r.definition || '')}">${r.definition ? escHtml(r.definition) : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td class="td-def" title="${escHtml(r.example_sentence || '')}">${r.example_sentence ? escHtml(r.example_sentence) : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td>
+          <div class="td-actions">
+            <button class="btn-icon edit" title="Edit" data-action="edit" data-id="${r.id}"
+              data-en="${escHtml(r.english_word)}" data-mrh="${escHtml(r.mara_word)}"
+              data-pos="${escHtml(r.part_of_speech||'')}" data-def="${escHtml(r.definition||'')}"
+              data-ex="${escHtml(r.example_sentence||'')}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="btn-icon delete" title="Delete" data-action="delete" data-id="${r.id}"
+              data-label="${escHtml(r.english_word)} / ${escHtml(r.mara_word)}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  document.getElementById('entries-tbody').addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    if (btn.dataset.action === 'edit') openEditModal(btn.dataset);
+    if (btn.dataset.action === 'delete') openConfirmModal(btn.dataset.id, btn.dataset.label);
+  });
+
+  // ── Pagination ─────────────────────────────────────────────────
+  function renderPagination() {
+    const el = document.getElementById('pagination');
+    if (state.totalPages <= 1 && state.total === 0) { el.innerHTML = ''; return; }
+
+    const start = (state.page - 1) * state.perPage + 1;
+    const end   = Math.min(state.page * state.perPage, state.total);
+
+    let pageButtons = '';
+    const maxBtns = 7;
+    let startP = Math.max(1, state.page - Math.floor(maxBtns / 2));
+    let endP   = Math.min(state.totalPages, startP + maxBtns - 1);
+    if (endP - startP < maxBtns - 1) startP = Math.max(1, endP - maxBtns + 1);
+
+    for (let p = startP; p <= endP; p++) {
+      pageButtons += `<button class="pag-btn${p === state.page ? ' active' : ''}" data-page="${p}">${p}</button>`;
+    }
+
+    el.innerHTML = `
+      <span class="pag-info">Showing ${start}–${end} of ${state.total.toLocaleString()} entries</span>
+      <div class="pag-controls">
+        <button class="pag-btn" data-page="1" ${state.page === 1 ? 'disabled' : ''}>&laquo;</button>
+        <button class="pag-btn" data-page="${state.page - 1}" ${state.page === 1 ? 'disabled' : ''}>&lsaquo;</button>
+        ${pageButtons}
+        <button class="pag-btn" data-page="${state.page + 1}" ${state.page === state.totalPages ? 'disabled' : ''}>&rsaquo;</button>
+        <button class="pag-btn" data-page="${state.totalPages}" ${state.page === state.totalPages ? 'disabled' : ''}>&raquo;</button>
+      </div>
+    `;
+
+    el.querySelectorAll('[data-page]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = parseInt(btn.dataset.page, 10);
+        if (p >= 1 && p <= state.totalPages && p !== state.page) {
+          state.page = p;
+          loadEntries();
+        }
+      });
+    });
+  }
+
+  // ── Search & filter ────────────────────────────────────────────
+  document.getElementById('search-input').addEventListener('input', e => {
+    clearTimeout(state.searchTimer);
+    state.searchTimer = setTimeout(() => {
+      state.query = e.target.value.trim();
+      state.page = 1;
+      loadEntries();
+    }, 350);
+  });
+  document.getElementById('lang-select').addEventListener('change', e => {
+    state.lang = e.target.value;
+    state.page = 1;
+    loadEntries();
+  });
+  document.getElementById('refresh-btn').addEventListener('click', () => {
+    loadStats();
+    loadEntries();
+  });
+
+  // ── Entry form modal ───────────────────────────────────────────
+  function openAddModal() {
+    state.editingId = null;
+    document.getElementById('modal-title').textContent = 'Add Entry';
+    document.getElementById('form-submit-btn').textContent = 'Add Entry';
+    document.getElementById('form-entry-id').value = '';
+    document.getElementById('f-english').value = '';
+    document.getElementById('f-mara').value = '';
+    document.getElementById('f-pos').value = '';
+    document.getElementById('f-definition').value = '';
+    document.getElementById('f-example').value = '';
+    document.getElementById('form-error').style.display = 'none';
+    openModal('form-modal');
+    document.getElementById('f-english').focus();
+  }
+
+  function openEditModal(data) {
+    state.editingId = parseInt(data.id, 10);
+    document.getElementById('modal-title').textContent = 'Edit Entry';
+    document.getElementById('form-submit-btn').textContent = 'Save Changes';
+    document.getElementById('form-entry-id').value = data.id;
+    document.getElementById('f-english').value = data.en;
+    document.getElementById('f-mara').value = data.mrh;
+    document.getElementById('f-pos').value = data.pos;
+    document.getElementById('f-definition').value = data.def;
+    document.getElementById('f-example').value = data.ex;
+    document.getElementById('form-error').style.display = 'none';
+    openModal('form-modal');
+    document.getElementById('f-english').focus();
+  }
+
+  document.getElementById('add-entry-btn').addEventListener('click', openAddModal);
+  document.getElementById('form-modal-close').addEventListener('click', () => closeModal('form-modal'));
+  document.getElementById('form-cancel-btn').addEventListener('click', () => closeModal('form-modal'));
+
+  document.getElementById('form-submit-btn').addEventListener('click', async () => {
+    const errEl = document.getElementById('form-error');
+    errEl.style.display = 'none';
+
+    const english_word     = document.getElementById('f-english').value.trim();
+    const mara_word        = document.getElementById('f-mara').value.trim();
+    const part_of_speech   = document.getElementById('f-pos').value.trim() || null;
+    const definition       = document.getElementById('f-definition').value.trim() || null;
+    const example_sentence = document.getElementById('f-example').value.trim() || null;
+
+    if (!english_word || !mara_word) {
+      errEl.textContent = 'English and Mara words are required.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    const body = { english_word, mara_word, part_of_speech, definition, example_sentence };
+    const btn = document.getElementById('form-submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    try {
+      if (state.editingId) {
+        await api(`/api/admin/entries/${state.editingId}`, { method: 'PUT', body: JSON.stringify(body) });
+        toast('Entry updated successfully.');
+      } else {
+        await api('/api/admin/entries', { method: 'POST', body: JSON.stringify(body) });
+        toast('Entry added successfully.');
+      }
+      closeModal('form-modal');
+      loadStats();
+      loadEntries();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = state.editingId ? 'Save Changes' : 'Add Entry';
+    }
+  });
+
+  document.getElementById('form-modal').addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      document.getElementById('form-submit-btn').click();
+    }
+  });
+
+  // ── Delete confirm modal ───────────────────────────────────────
+  function openConfirmModal(id, label) {
+    state.deletingId = parseInt(id, 10);
+    document.getElementById('confirm-word-label').textContent = `"${label}"`;
+    openModal('confirm-modal');
+  }
+
+  document.getElementById('confirm-modal-close').addEventListener('click', () => closeModal('confirm-modal'));
+  document.getElementById('confirm-cancel-btn').addEventListener('click', () => closeModal('confirm-modal'));
+
+  document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('confirm-delete-btn');
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    try {
+      await api(`/api/admin/entries/${state.deletingId}`, { method: 'DELETE' });
+      toast('Entry deleted.', 'success');
+      closeModal('confirm-modal');
+      if (state.page > 1 && state.total - 1 <= (state.page - 1) * state.perPage) {
+        state.page--;
+      }
+      loadStats();
+      loadEntries();
+    } catch (err) {
+      toast(`Delete failed: ${err.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+    }
+  });
+
+  // ── Modal helpers ──────────────────────────────────────────────
+  function openModal(id) {
+    document.getElementById(id).classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) closeModal(overlay.id);
+    });
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.open').forEach(el => closeModal(el.id));
+    }
+  });
+
+  // ── Init ───────────────────────────────────────────────────────
+  loadStats();
+  loadEntries();
+  </script>
+</body>
+</html>
