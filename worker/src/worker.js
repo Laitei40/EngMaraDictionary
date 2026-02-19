@@ -576,6 +576,23 @@ async function handleAdmin(request, url, env, corsHeaders) {
     }
   }
 
+  // GET /api/admin/entries/:id/meanings — fetch meanings for an entry
+  const meaningsGetMatch = url.pathname.match(/^\/api\/admin\/entries\/(\d+)\/meanings$/);
+  if (meaningsGetMatch && method === 'GET') {
+    const id = parseInt(meaningsGetMatch[1], 10);
+    try {
+      const { results } = await db.prepare(`
+        SELECT id, part_of_speech, definition, examples, "order"
+        FROM meanings
+        WHERE dictionary_id = ?1
+        ORDER BY "order" ASC, id ASC
+      `).bind(id).all();
+      return jsonResponse({ results }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
   // GET /api/admin/entries — list all entries (paginated + optional filter)
   if (url.pathname === '/api/admin/entries' && method === 'GET') {
     const page    = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
@@ -634,10 +651,17 @@ async function handleAdmin(request, url, env, corsHeaders) {
       return jsonResponse({ error: 'Invalid JSON body' }, 400, corsHeaders);
     }
 
-    const { english_word, mara_word, part_of_speech, definition, example_sentence } = body;
+    const { english_word, mara_word } = body;
     if (!english_word || !mara_word) {
       return jsonResponse({ error: 'english_word and mara_word are required' }, 400, corsHeaders);
     }
+
+    // Support both new (meanings array) and legacy (flat fields) format
+    const meaningsList = Array.isArray(body.meanings) && body.meanings.length > 0 ? body.meanings : null;
+    const first = meaningsList ? meaningsList[0] : body;
+    const part_of_speech   = first.part_of_speech?.trim() || null;
+    const definition       = first.definition?.trim() || null;
+    const example_sentence = (first.example || first.example_sentence || '').trim() || null;
 
     try {
       const result = await db.prepare(
@@ -646,15 +670,25 @@ async function handleAdmin(request, url, env, corsHeaders) {
       ).bind(
         english_word.trim(),
         mara_word.trim(),
-        part_of_speech?.trim() || null,
-        definition?.trim() || null,
-        example_sentence?.trim() || null,
+        part_of_speech,
+        definition,
+        example_sentence,
       ).run();
 
-      const created = await db.prepare(
-        'SELECT * FROM dictionary WHERE id = ?1'
-      ).bind(result.meta.last_row_id).first();
+      const entryId = result.meta.last_row_id;
 
+      if (meaningsList) {
+        for (let i = 0; i < meaningsList.length; i++) {
+          const m = meaningsList[i];
+          if (!m.definition?.trim()) continue;
+          const exJson = m.example?.trim() ? JSON.stringify([m.example.trim()]) : null;
+          await db.prepare(
+            `INSERT INTO meanings (dictionary_id, part_of_speech, definition, examples, "order") VALUES (?1, ?2, ?3, ?4, ?5)`
+          ).bind(entryId, m.part_of_speech?.trim() || null, m.definition.trim(), exJson, i).run();
+        }
+      }
+
+      const created = await db.prepare('SELECT * FROM dictionary WHERE id = ?1').bind(entryId).first();
       return jsonResponse({ success: true, entry: created }, 201, corsHeaders);
     } catch (err) {
       return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
@@ -672,10 +706,17 @@ async function handleAdmin(request, url, env, corsHeaders) {
       return jsonResponse({ error: 'Invalid JSON body' }, 400, corsHeaders);
     }
 
-    const { english_word, mara_word, part_of_speech, definition, example_sentence } = body;
+    const { english_word, mara_word } = body;
     if (!english_word || !mara_word) {
       return jsonResponse({ error: 'english_word and mara_word are required' }, 400, corsHeaders);
     }
+
+    // Support both new (meanings array) and legacy (flat fields) format
+    const meaningsList = Array.isArray(body.meanings) && body.meanings.length > 0 ? body.meanings : null;
+    const first = meaningsList ? meaningsList[0] : body;
+    const part_of_speech   = first.part_of_speech?.trim() || null;
+    const definition       = first.definition?.trim() || null;
+    const example_sentence = (first.example || first.example_sentence || '').trim() || null;
 
     try {
       const existing = await db.prepare('SELECT id FROM dictionary WHERE id = ?1').bind(id).first();
@@ -684,18 +725,24 @@ async function handleAdmin(request, url, env, corsHeaders) {
       }
 
       await db.prepare(
-        `UPDATE dictionary
-         SET english_word = ?1, mara_word = ?2, part_of_speech = ?3,
-             definition = ?4, example_sentence = ?5
-         WHERE id = ?6`
+        `UPDATE dictionary SET english_word = ?1, mara_word = ?2, part_of_speech = ?3,
+             definition = ?4, example_sentence = ?5 WHERE id = ?6`
       ).bind(
-        english_word.trim(),
-        mara_word.trim(),
-        part_of_speech?.trim() || null,
-        definition?.trim() || null,
-        example_sentence?.trim() || null,
-        id,
+        english_word.trim(), mara_word.trim(), part_of_speech, definition, example_sentence, id,
       ).run();
+
+      if (meaningsList) {
+        // Replace all meanings for this entry
+        await db.prepare('DELETE FROM meanings WHERE dictionary_id = ?1').bind(id).run();
+        for (let i = 0; i < meaningsList.length; i++) {
+          const m = meaningsList[i];
+          if (!m.definition?.trim()) continue;
+          const exJson = m.example?.trim() ? JSON.stringify([m.example.trim()]) : null;
+          await db.prepare(
+            `INSERT INTO meanings (dictionary_id, part_of_speech, definition, examples, "order") VALUES (?1, ?2, ?3, ?4, ?5)`
+          ).bind(id, m.part_of_speech?.trim() || null, m.definition.trim(), exJson, i).run();
+        }
+      }
 
       const updated = await db.prepare('SELECT * FROM dictionary WHERE id = ?1').bind(id).first();
       return jsonResponse({ success: true, entry: updated }, 200, corsHeaders);

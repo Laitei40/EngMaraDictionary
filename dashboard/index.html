@@ -172,7 +172,7 @@
     /* ── Modal ── */
     .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:500; display:flex; align-items:center; justify-content:center; padding:1rem; opacity:0; pointer-events:none; transition:opacity var(--transition); }
     .modal-overlay.open { opacity:1; pointer-events:auto; }
-    .modal { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-xl); width:100%; max-width:540px; max-height:90vh; overflow-y:auto; transform:translateY(16px) scale(.98); transition:transform .2s cubic-bezier(.34,1.56,.64,1); }
+    .modal { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-xl); width:100%; max-width:640px; max-height:90vh; overflow-y:auto; transform:translateY(16px) scale(.98); transition:transform .2s cubic-bezier(.34,1.56,.64,1); }
     .modal-overlay.open .modal { transform:translateY(0) scale(1); }
     .modal-header { padding:1.375rem 1.5rem 0; display:flex; align-items:flex-start; justify-content:space-between; }
     .modal-header h3 { font-size:1.1rem; font-weight:700; }
@@ -181,6 +181,22 @@
     .modal-body { padding:1.25rem 1.5rem; }
     .modal-footer { padding:0 1.5rem 1.5rem; display:flex; justify-content:flex-end; gap:.625rem; border-top:1px solid var(--border); padding-top:1.125rem; margin-top:.25rem; }
     .modal-error { background:var(--red-bg); color:var(--red); border:1px solid var(--red); border-radius:var(--radius-sm); padding:.55rem .8rem; font-size:.82rem; margin-bottom:1rem; display:none; }
+
+    /* ── Meanings list ── */
+    .meanings-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.5rem; }
+    .meanings-header label { margin-bottom:0; }
+    .meaning-card { border:1px solid var(--border); border-radius:var(--radius-md); padding:.875rem 1rem; margin-bottom:.625rem; background:var(--bg-subtle); }
+    .meaning-card-header { display:flex; align-items:center; gap:.5rem; margin-bottom:.625rem; }
+    .meaning-card-num { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-3); min-width:1.75rem; flex-shrink:0; }
+    .meaning-card-header select { flex:1; min-width:0; }
+    .meaning-remove-btn { width:28px; height:28px; border-radius:var(--radius-sm); border:1px solid var(--border); background:transparent; color:var(--red); cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:all var(--transition); }
+    .meaning-remove-btn:hover { background:var(--red-bg); border-color:var(--red); }
+    .mc-definition, .mc-example { width:100%; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text); padding:.5rem .625rem; font-size:.875rem; resize:vertical; transition:border-color var(--transition); }
+    .mc-definition { margin-bottom:.5rem; min-height:60px; }
+    .mc-example { min-height:50px; }
+    .mc-definition:focus, .mc-example:focus { outline:none; border-color:var(--border-focus); box-shadow:var(--ring); }
+    .btn-add-meaning { display:flex; align-items:center; gap:.35rem; font-size:.8rem; padding:.3rem .65rem; }
+    .meanings-empty { text-align:center; padding:1.25rem; color:var(--text-3); font-size:.85rem; border:1px dashed var(--border); border-radius:var(--radius-md); }
 
     /* ── Confirm dialog ── */
     .confirm-modal { max-width:380px; }
@@ -413,29 +429,14 @@
           </div>
         </div>
         <div class="field">
-          <label for="f-pos">Part of Speech</label>
-          <select id="f-pos">
-            <option value="">— select —</option>
-            <option value="noun">noun</option>
-            <option value="verb">verb</option>
-            <option value="adjective">adjective</option>
-            <option value="adverb">adverb</option>
-            <option value="phrase">phrase</option>
-            <option value="interjection">interjection</option>
-            <option value="number">number</option>
-            <option value="particle">particle</option>
-            <option value="pronoun">pronoun</option>
-            <option value="conjunction">conjunction</option>
-            <option value="preposition">preposition</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="f-definition">Definition</label>
-          <textarea id="f-definition" placeholder="Short definition or meaning…"></textarea>
-        </div>
-        <div class="field">
-          <label for="f-example">Example Sentence</label>
-          <textarea id="f-example" placeholder="An example sentence showing usage…"></textarea>
+          <div class="meanings-header">
+            <label>Meanings <span class="field-hint" style="display:inline">(one per sense)</span></label>
+            <button type="button" id="add-meaning-btn" class="btn btn-ghost btn-add-meaning">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Meaning
+            </button>
+          </div>
+          <div id="meanings-list"></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -754,6 +755,64 @@
   });
   document.getElementById('refresh-suggestions-btn').addEventListener('click', loadSuggestions);
 
+  // ── Meaning card helpers ────────────────────────────────────────
+  const POS_OPTIONS = ['noun','verb','adjective','adverb','phrase','interjection','number','particle','pronoun','conjunction','preposition'];
+
+  function posSelectHTML(selected) {
+    return `<select class="mc-pos">
+      <option value="">— part of speech —</option>
+      ${POS_OPTIONS.map(p => `<option value="${p}"${p === selected ? ' selected' : ''}>${p}</option>`).join('')}
+    </select>`;
+  }
+
+  function addMeaningCard(vals = {}, focus = false) {
+    const list = document.getElementById('meanings-list');
+    const card = document.createElement('div');
+    card.className = 'meaning-card';
+    card.innerHTML = `
+      <div class="meaning-card-header">
+        <span class="meaning-card-num">#1</span>
+        ${posSelectHTML(vals.pos || '')}
+        <button type="button" class="meaning-remove-btn" aria-label="Remove meaning">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <textarea class="mc-definition" rows="2" placeholder="Definition or meaning…"></textarea>
+      <textarea class="mc-example" rows="2" placeholder="Example sentence (optional)…"></textarea>
+    `;
+    card.querySelector('.mc-definition').value = vals.definition || '';
+    card.querySelector('.mc-example').value = vals.example || '';
+    card.querySelector('.meaning-remove-btn').addEventListener('click', () => {
+      card.remove();
+      renumberMeanings();
+      if (!document.getElementById('meanings-list').children.length) showMeaningsEmpty();
+    });
+    list.appendChild(card);
+    renumberMeanings();
+    if (focus) card.querySelector('.mc-definition').focus();
+  }
+
+  function renumberMeanings() {
+    document.querySelectorAll('#meanings-list .meaning-card').forEach((c, i) => {
+      c.querySelector('.meaning-card-num').textContent = `#${i + 1}`;
+    });
+  }
+
+  function showMeaningsEmpty() {
+    const list = document.getElementById('meanings-list');
+    const el = document.createElement('div');
+    el.className = 'meanings-empty';
+    el.id = 'meanings-empty-hint';
+    el.textContent = 'No meanings yet. Click “Add Meaning” to start.';
+    list.appendChild(el);
+  }
+
+  document.getElementById('add-meaning-btn').addEventListener('click', () => {
+    const empty = document.getElementById('meanings-empty-hint');
+    if (empty) empty.remove();
+    addMeaningCard({}, true);
+  });
+
   // ── Entry form modal ───────────────────────────────────────────
   function openAddModal() {
     state.editingId = null;
@@ -762,27 +821,42 @@
     document.getElementById('form-entry-id').value = '';
     document.getElementById('f-english').value = '';
     document.getElementById('f-mara').value = '';
-    document.getElementById('f-pos').value = '';
-    document.getElementById('f-definition').value = '';
-    document.getElementById('f-example').value = '';
     document.getElementById('form-error').style.display = 'none';
+    document.getElementById('meanings-list').innerHTML = '';
+    addMeaningCard();
     openModal('form-modal');
     document.getElementById('f-english').focus();
   }
 
-  function openEditModal(data) {
+  async function openEditModal(data) {
     state.editingId = parseInt(data.id, 10);
     document.getElementById('modal-title').textContent = 'Edit Entry';
     document.getElementById('form-submit-btn').textContent = 'Save Changes';
     document.getElementById('form-entry-id').value = data.id;
     document.getElementById('f-english').value = data.en;
     document.getElementById('f-mara').value = data.mrh;
-    document.getElementById('f-pos').value = data.pos;
-    document.getElementById('f-definition').value = data.def;
-    document.getElementById('f-example').value = data.ex;
     document.getElementById('form-error').style.display = 'none';
+    const list = document.getElementById('meanings-list');
+    list.innerHTML = '<p style="color:var(--text-3);font-size:.85rem;padding:.5rem 0">Loading meanings…</p>';
     openModal('form-modal');
     document.getElementById('f-english').focus();
+    try {
+      const res = await api(`/api/admin/entries/${state.editingId}/meanings`);
+      list.innerHTML = '';
+      if (res.results && res.results.length > 0) {
+        res.results.forEach(m => {
+          let ex = '';
+          if (m.examples) { try { const a = JSON.parse(m.examples); ex = Array.isArray(a) ? (a[0] || '') : m.examples; } catch { ex = m.examples; } }
+          addMeaningCard({ pos: m.part_of_speech || '', definition: m.definition || '', example: ex });
+        });
+      } else {
+        // Fall back to the inline data from the table row
+        addMeaningCard({ pos: data.pos || '', definition: data.def || '', example: data.ex || '' });
+      }
+    } catch {
+      list.innerHTML = '';
+      addMeaningCard({ pos: data.pos || '', definition: data.def || '', example: data.ex || '' });
+    }
   }
 
   document.getElementById('add-entry-btn').addEventListener('click', openAddModal);
@@ -793,11 +867,8 @@
     const errEl = document.getElementById('form-error');
     errEl.style.display = 'none';
 
-    const english_word     = document.getElementById('f-english').value.trim();
-    const mara_word        = document.getElementById('f-mara').value.trim();
-    const part_of_speech   = document.getElementById('f-pos').value.trim() || null;
-    const definition       = document.getElementById('f-definition').value.trim() || null;
-    const example_sentence = document.getElementById('f-example').value.trim() || null;
+    const english_word = document.getElementById('f-english').value.trim();
+    const mara_word    = document.getElementById('f-mara').value.trim();
 
     if (!english_word || !mara_word) {
       errEl.textContent = 'English and Mara words are required.';
@@ -805,7 +876,19 @@
       return;
     }
 
-    const body = { english_word, mara_word, part_of_speech, definition, example_sentence };
+    const meanings = Array.from(document.querySelectorAll('#meanings-list .meaning-card')).map(card => ({
+      part_of_speech: card.querySelector('.mc-pos').value.trim() || null,
+      definition:     card.querySelector('.mc-definition').value.trim(),
+      example:        card.querySelector('.mc-example').value.trim() || null,
+    })).filter(m => m.definition);
+
+    if (!meanings.length) {
+      errEl.textContent = 'Add at least one meaning with a definition.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    const body = { english_word, mara_word, meanings };
     const btn = document.getElementById('form-submit-btn');
     btn.disabled = true;
     btn.textContent = 'Saving…';
