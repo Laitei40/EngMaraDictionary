@@ -168,7 +168,7 @@
         </div>
         <div class="footer-links">
           <a href="/about.html">About</a>
-          <a href="https://docs.google.com/forms/d/e/1FAIpQLSceWwVrtH5KivCR3wuvKqMn8U238-aCxOJIIWs1gK4pt994oA/viewform" target="_blank" rel="noopener">Suggest a Word</a>
+          <a href="#" id="footer-suggest-link">Suggest a Word</a>
           <a href="https://github.com/Laitei40/EngMaraDictionary" target="_blank" rel="noopener">GitHub</a>
         </div>
       </div>
@@ -186,6 +186,68 @@
         <p>MaraDict uses cookies &amp; local storage to cache searches and remember your preferences.</p>
       </div>
       <button id="cookie-accept" class="cookie-accept">Got it</button>
+    </div>
+  </div>
+
+  <!-- ── Suggest Improvement Modal ── -->
+  <div id="suggest-modal" class="suggest-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="suggest-modal-title">
+    <div class="suggest-modal">
+      <div class="suggest-modal-header">
+        <h3 id="suggest-modal-title">Suggest improvement</h3>
+        <button type="button" id="suggest-close" class="suggest-modal-close" aria-label="Close suggestion form">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="suggest-modal-body">
+        <div id="suggest-error" class="suggest-error hidden"></div>
+        <div id="suggest-success" class="suggest-success hidden"></div>
+
+        <div class="suggest-field-row">
+          <div class="suggest-field">
+            <label for="suggest-source-word">Word</label>
+            <input id="suggest-source-word" type="text" readonly>
+          </div>
+          <div class="suggest-field">
+            <label for="suggest-language">Direction</label>
+            <input id="suggest-language" type="text" readonly>
+          </div>
+        </div>
+
+        <div class="suggest-field">
+          <label for="suggest-translation">Current translation</label>
+          <input id="suggest-translation" type="text" readonly>
+        </div>
+
+        <div class="suggest-field">
+          <label for="suggest-definition">Suggested meaning <span class="field-required">*</span></label>
+          <textarea id="suggest-definition" placeholder="Provide the corrected or improved meaning..." required></textarea>
+        </div>
+
+        <div class="suggest-field">
+          <label for="suggest-example">Suggested example sentence</label>
+          <textarea id="suggest-example" placeholder="Optional example usage"></textarea>
+        </div>
+
+        <div class="suggest-field">
+          <label for="suggest-notes">Additional notes</label>
+          <textarea id="suggest-notes" placeholder="Any context, grammar notes, or extra details"></textarea>
+        </div>
+
+        <div class="suggest-field-row">
+          <div class="suggest-field">
+            <label for="suggest-name">Your name (optional)</label>
+            <input id="suggest-name" type="text" placeholder="e.g. Laitei">
+          </div>
+          <div class="suggest-field">
+            <label for="suggest-email">Email (optional)</label>
+            <input id="suggest-email" type="email" placeholder="name@example.com">
+          </div>
+        </div>
+      </div>
+      <div class="suggest-modal-footer">
+        <button type="button" id="suggest-cancel" class="detail-back-btn">Cancel</button>
+        <button type="button" id="suggest-submit" class="contribute-link contribute-link-primary">Submit suggestion</button>
+      </div>
     </div>
   </div>
 

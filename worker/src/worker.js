@@ -8,12 +8,14 @@
  *   GET /api/browse?letter=<A-Z>&lang=en|mrh&page=1 — Browse words alphabetically
  *   GET /api/stats                                  — Dictionary statistics
  *   GET /api/health                                 — Health check
+ *   POST /api/suggestions                            — Submit word improvement suggestion
  *
  * Admin CRUD Endpoints (protected by Cloudflare Access):
  *   GET    /api/admin/entries?page=1&q=<filter>     — List all entries (paginated)
  *   POST   /api/admin/entries                       — Create a new entry
  *   PUT    /api/admin/entries/:id                   — Update an existing entry
  *   DELETE /api/admin/entries/:id                   — Delete an entry
+ *   GET    /api/admin/suggestions                   — List user suggestions
  *
  * Binds to a Cloudflare D1 database named DB.
  * Set the ADMIN_KEY secret:  npx wrangler secret put ADMIN_KEY
@@ -41,6 +43,14 @@ export default {
     // Admin CRUD routes — skip the GET-only guard for /api/admin/*
     if (url.pathname.startsWith('/api/admin/')) {
       return await handleAdmin(request, url, env, corsHeaders);
+    }
+
+    // Public suggestion submit route
+    if (url.pathname === '/api/suggestions') {
+      if (request.method !== 'POST') {
+        return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
+      }
+      return await handleSuggestionSubmit(request, env.DB, corsHeaders);
     }
 
     // Only allow GET and HEAD for public routes
@@ -382,6 +392,73 @@ async function handleStats(db, corsHeaders) {
 }
 
 /**
+ * Save a dictionary improvement suggestion submitted by users.
+ * POST /api/suggestions
+ */
+async function handleSuggestionSubmit(request, db, corsHeaders) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON body' }, 400, corsHeaders);
+  }
+
+  const source_word = String(body.source_word || '').trim();
+  const source_lang = String(body.source_lang || '').trim().toLowerCase();
+  const english_word = String(body.english_word || '').trim() || null;
+  const mara_word = String(body.mara_word || '').trim() || null;
+  const suggested_definition = String(body.suggested_definition || '').trim();
+  const suggested_example = String(body.suggested_example || '').trim() || null;
+  const notes = String(body.notes || '').trim() || null;
+  const submitter_name = String(body.submitter_name || '').trim() || null;
+  const submitter_email = String(body.submitter_email || '').trim() || null;
+
+  if (!source_word || !suggested_definition) {
+    return jsonResponse({ error: 'source_word and suggested_definition are required' }, 400, corsHeaders);
+  }
+
+  if (source_lang !== 'en' && source_lang !== 'mrh') {
+    return jsonResponse({ error: 'Invalid source_lang. Use "en" or "mrh".' }, 400, corsHeaders);
+  }
+
+  if (source_word.length > 120 || suggested_definition.length > 5000) {
+    return jsonResponse({ error: 'Input too long' }, 400, corsHeaders);
+  }
+
+  if (submitter_email && !/^\S+@\S+\.\S+$/.test(submitter_email)) {
+    return jsonResponse({ error: 'Invalid email format' }, 400, corsHeaders);
+  }
+
+  try {
+    const result = await db.prepare(`
+      INSERT INTO suggestions (
+        source_word, source_lang, english_word, mara_word,
+        suggested_definition, suggested_example, notes,
+        submitter_name, submitter_email
+      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+    `).bind(
+      source_word,
+      source_lang,
+      english_word,
+      mara_word,
+      suggested_definition,
+      suggested_example,
+      notes,
+      submitter_name,
+      submitter_email,
+    ).run();
+
+    return jsonResponse({
+      success: true,
+      id: result.meta.last_row_id,
+      message: 'Suggestion submitted successfully',
+    }, 201, corsHeaders);
+  } catch (err) {
+    return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+  }
+}
+
+/**
  * ─────────────────────────────────────────────
  * Admin CRUD handler — routes to sub-handlers.
  * All routes require the X-Admin-Key header.
@@ -390,6 +467,61 @@ async function handleStats(db, corsHeaders) {
 async function handleAdmin(request, url, env, corsHeaders) {
   const db = env.DB;
   const method = request.method;
+
+  // GET /api/admin/suggestions — list submitted suggestions
+  if (url.pathname === '/api/admin/suggestions' && method === 'GET') {
+    const page    = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+    const perPage = Math.min(100, Math.max(1, parseInt(url.searchParams.get('per_page') || '50', 10)));
+    const offset  = (page - 1) * perPage;
+    const q       = (url.searchParams.get('q') || '').trim();
+    const status  = (url.searchParams.get('status') || '').trim().toLowerCase();
+
+    try {
+      const whereParts = [];
+      const bindings = [];
+
+      if (q) {
+        bindings.push(`%${q.toLowerCase()}%`);
+        const idx = bindings.length;
+        whereParts.push(`(LOWER(source_word) LIKE ?${idx} OR LOWER(suggested_definition) LIKE ?${idx})`);
+      }
+
+      if (status) {
+        bindings.push(status);
+        whereParts.push(`LOWER(status) = ?${bindings.length}`);
+      }
+
+      const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+
+      const countResult = await db.prepare(
+        `SELECT COUNT(*) AS total FROM suggestions ${whereClause}`
+      ).bind(...bindings).first();
+
+      const total = countResult?.total || 0;
+
+      const paginationBindings = [...bindings, perPage, offset];
+      const limitIndex = bindings.length + 1;
+      const { results } = await db.prepare(`
+        SELECT id, source_word, source_lang, english_word, mara_word,
+               suggested_definition, suggested_example, notes,
+               submitter_name, submitter_email, status, created_at
+        FROM suggestions
+        ${whereClause}
+        ORDER BY id DESC
+        LIMIT ?${limitIndex} OFFSET ?${limitIndex + 1}
+      `).bind(...paginationBindings).all();
+
+      return jsonResponse({
+        page,
+        perPage,
+        total,
+        totalPages: Math.ceil(total / perPage),
+        results,
+      }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
 
   // GET /api/admin/entries — list all entries (paginated + optional filter)
   if (url.pathname === '/api/admin/entries' && method === 'GET') {

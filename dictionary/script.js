@@ -221,7 +221,24 @@ const API = (() => {
     } catch { return null; }
   }
 
-  return { search, suggest, word, browse };
+  /** Submit improvement suggestion */
+  async function submitSuggestion(payload) {
+    const res = await fetch(`${Config.API_BASE}/api/suggestions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    return data;
+  }
+
+  return { search, suggest, word, browse, submitSuggestion };
 })();
 
 
@@ -350,12 +367,15 @@ const UI = (() => {
   const $alphabetBar      = document.getElementById('alphabet-bar');
   const $browseResults    = document.getElementById('browse-results');
   const $alphabetSection  = document.getElementById('alphabet-browser');
+  const $suggestModal     = document.getElementById('suggest-modal');
+  const $footerSuggest    = document.getElementById('footer-suggest-link');
 
   let _currentLang    = 'en';
   let _debounceTimer  = null;
   let _suggestTimer   = null;
   let _lastQuery      = '';
   let _suggestIdx     = -1;
+  let _suggestContext = null;
 
   // ── Helpers ──
 
@@ -442,6 +462,94 @@ const UI = (() => {
     }).catch(() => {
       prompt('Copy this link:', text);
     });
+  }
+
+  function _closeSuggestModal() {
+    if (!$suggestModal) return;
+    $suggestModal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  function _openSuggestModal(context) {
+    if (!$suggestModal) return;
+    _suggestContext = context || null;
+
+    const sourceWordInput = document.getElementById('suggest-source-word');
+    const languageInput = document.getElementById('suggest-language');
+    const translationInput = document.getElementById('suggest-translation');
+    const definitionInput = document.getElementById('suggest-definition');
+    const exampleInput = document.getElementById('suggest-example');
+    const notesInput = document.getElementById('suggest-notes');
+    const nameInput = document.getElementById('suggest-name');
+    const emailInput = document.getElementById('suggest-email');
+    const errEl = document.getElementById('suggest-error');
+    const okEl = document.getElementById('suggest-success');
+
+    sourceWordInput.value = context?.source_word || $searchInput.value.trim() || '';
+    languageInput.value = (context?.source_lang || _currentLang) === 'en' ? 'English → Mara' : 'Mara → English';
+    translationInput.value = context?.translation || '';
+
+    definitionInput.value = '';
+    exampleInput.value = '';
+    notesInput.value = '';
+    nameInput.value = '';
+    emailInput.value = '';
+    errEl.classList.add('hidden');
+    errEl.textContent = '';
+    okEl.classList.add('hidden');
+    okEl.textContent = '';
+
+    $suggestModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    definitionInput.focus();
+  }
+
+  async function _submitSuggestion() {
+    const errEl = document.getElementById('suggest-error');
+    const okEl = document.getElementById('suggest-success');
+    const submitBtn = document.getElementById('suggest-submit');
+
+    const payload = {
+      source_word: (_suggestContext?.source_word || document.getElementById('suggest-source-word').value || '').trim(),
+      source_lang: (_suggestContext?.source_lang || _currentLang).trim(),
+      english_word: (_suggestContext?.english_word || '').trim() || null,
+      mara_word: (_suggestContext?.mara_word || '').trim() || null,
+      suggested_definition: document.getElementById('suggest-definition').value.trim(),
+      suggested_example: document.getElementById('suggest-example').value.trim() || null,
+      notes: document.getElementById('suggest-notes').value.trim() || null,
+      submitter_name: document.getElementById('suggest-name').value.trim() || null,
+      submitter_email: document.getElementById('suggest-email').value.trim() || null,
+    };
+
+    errEl.classList.add('hidden');
+    errEl.textContent = '';
+    okEl.classList.add('hidden');
+    okEl.textContent = '';
+
+    if (!payload.source_word || !payload.suggested_definition) {
+      errEl.textContent = 'Word and suggested meaning are required.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+    try {
+      await API.submitSuggestion(payload);
+      okEl.textContent = 'Thanks! Your suggestion has been submitted.';
+      okEl.classList.remove('hidden');
+      document.getElementById('suggest-definition').value = '';
+      document.getElementById('suggest-example').value = '';
+      document.getElementById('suggest-notes').value = '';
+      document.getElementById('suggest-name').value = '';
+      document.getElementById('suggest-email').value = '';
+    } catch (err) {
+      errEl.textContent = err.message || 'Failed to submit suggestion.';
+      errEl.classList.remove('hidden');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit suggestion';
+    }
   }
 
   // ── Rendering ──
@@ -642,7 +750,7 @@ const UI = (() => {
     // Contribute prompt — "Help us shape the term" like MyOrdbok
     html += `<div class="dict-contribute">`;
     html += `  <h4 class="dict-contribute-title">Help us shape the term of \u201c${_escapeHtml(sourceWord)}\u201d</h4>`;
-    html += `  <p class="dict-contribute-text">The contribution always plays a crucial role in shaping the excellence of <strong>${_escapeHtml(sourceWord)}</strong>. By sharing your insights on it context using Google Forms such as,</p>`;
+    html += `  <p class="dict-contribute-text">The contribution always plays a crucial role in shaping the excellence of <strong>${_escapeHtml(sourceWord)}</strong>. By sharing your insights through this form, such as:</p>`;
     html += `  <ul class="dict-contribute-list">`;
     html += `    <li>\u2026definition: meaning, translation</li>`;
     html += `    <li>\u2026grammar: spelling, punctuation</li>`;
@@ -651,8 +759,8 @@ const UI = (() => {
     html += `  <p class="dict-contribute-text">\u2026its actively help us refine meaningful content and elevate the user experience.</p>`;
     html += `  <p class="dict-contribute-text">We want you to know that your efforts are immensely appreciated and instrumental in making the dictionary even better.</p>`;
     html += `  <div class="dict-contribute-actions">`;
-    html += `    <a href="https://docs.google.com/forms/d/e/1FAIpQLSceWwVrtH5KivCR3wuvKqMn8U238-aCxOJIIWs1gK4pt994oA/viewform" target="_blank" rel="noopener" class="contribute-link contribute-link-primary">\u270F\uFE0F Suggest improvement</a>`;
-    html += `    <a href="https://docs.google.com/forms/d/e/1FAIpQLSceWwVrtH5KivCR3wuvKqMn8U238-aCxOJIIWs1gK4pt994oA/viewform" target="_blank" rel="noopener" class="contribute-link">Your feedback on overall experiences is also highly welcome</a>`;
+    html += `    <button type="button" class="contribute-link contribute-link-primary" data-action="suggest-improvement">\u270F\uFE0F Suggest improvement</button>`;
+    html += `    <button type="button" class="contribute-link" data-action="suggest-improvement">Your feedback on overall experiences is also highly welcome</button>`;
     html += `  </div>`;
     html += `</div>`;
 
@@ -671,6 +779,19 @@ const UI = (() => {
         $searchInput.value = btn.dataset.word;
         _lastQuery = '';
         _executeSearch(btn.dataset.word, true);
+      });
+    });
+
+    $resultsContainer.querySelectorAll('[data-action="suggest-improvement"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const primary = results[0] || {};
+        _openSuggestModal({
+          source_word: sourceWord,
+          source_lang: isEnToMara ? 'en' : 'mrh',
+          english_word: primary.english_word || (isEnToMara ? sourceWord : ''),
+          mara_word: primary.mara_word || (isEnToMara ? '' : sourceWord),
+          translation: isEnToMara ? (primary.mara_word || '') : (primary.english_word || ''),
+        });
       });
     });
 
@@ -1021,6 +1142,39 @@ const UI = (() => {
     document.addEventListener('keydown', _onGlobalKeyDown);
     document.addEventListener('click', _onDocClick);
     window.addEventListener('popstate', _onPopState);
+
+    if ($footerSuggest) {
+      $footerSuggest.addEventListener('click', (e) => {
+        e.preventDefault();
+        _openSuggestModal({
+          source_word: $searchInput.value.trim() || '',
+          source_lang: _currentLang,
+          english_word: _currentLang === 'en' ? $searchInput.value.trim() : '',
+          mara_word: _currentLang === 'mrh' ? $searchInput.value.trim() : '',
+          translation: '',
+        });
+      });
+    }
+
+    const suggestClose = document.getElementById('suggest-close');
+    const suggestCancel = document.getElementById('suggest-cancel');
+    const suggestSubmit = document.getElementById('suggest-submit');
+
+    if (suggestClose) suggestClose.addEventListener('click', _closeSuggestModal);
+    if (suggestCancel) suggestCancel.addEventListener('click', _closeSuggestModal);
+    if (suggestSubmit) suggestSubmit.addEventListener('click', _submitSuggestion);
+
+    if ($suggestModal) {
+      $suggestModal.addEventListener('click', (e) => {
+        if (e.target === $suggestModal) _closeSuggestModal();
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $suggestModal && !$suggestModal.classList.contains('hidden')) {
+        _closeSuggestModal();
+      }
+    });
 
     Network.onChange(_onNetworkChange);
     _updateOfflineBadge(Network.isOnline());

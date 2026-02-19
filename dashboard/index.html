@@ -135,8 +135,11 @@
     .td-mrh { color:var(--accent); font-weight:500; }
     .td-pos .pos-badge { display:inline-block; padding:.15rem .55rem; border-radius:var(--radius-full); font-size:.7rem; font-weight:600; background:var(--accent-muted); color:var(--accent); }
     .td-def { max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-2); font-size:.82rem; }
+    .td-long { max-width:360px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-2); font-size:.82rem; }
     .td-id { color:var(--text-3); font-size:.78rem; font-variant-numeric:tabular-nums; }
     .td-actions { white-space:nowrap; display:flex; gap:.375rem; }
+    .section-head { margin:1.25rem 0 .6rem; display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+    .section-head h2 { font-size:1rem; font-weight:700; color:var(--text); }
 
     /* ── Pagination ── */
     .pagination { display:flex; align-items:center; justify-content:space-between; padding:.875rem 1.25rem; border-top:1px solid var(--border); font-size:.825rem; color:var(--text-2); flex-wrap:wrap; gap:.5rem; }
@@ -326,6 +329,40 @@
           <div class="pagination" id="pagination"></div>
         </div>
 
+        <div class="section-head">
+          <h2>Improvement Suggestions</h2>
+          <button class="btn btn-ghost" id="refresh-suggestions-btn" title="Refresh suggestions">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Refresh Suggestions
+          </button>
+        </div>
+
+        <div class="table-card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:56px">ID</th>
+                  <th>Word</th>
+                  <th>Direction</th>
+                  <th>Suggested Meaning</th>
+                  <th>Notes</th>
+                  <th>Contact</th>
+                  <th style="width:110px">Submitted</th>
+                </tr>
+              </thead>
+              <tbody id="suggestions-tbody">
+                <tr><td colspan="7">
+                  <div class="table-empty">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <p>Loading suggestions…</p>
+                  </div>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -513,6 +550,7 @@
     closeModal('url-modal');
     loadStats();
     loadEntries();
+    loadSuggestions();
   });
   document.getElementById('input-api-url').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('url-modal-save').click();
@@ -572,6 +610,22 @@
     }
   }
 
+  async function loadSuggestions() {
+    const tbody = document.getElementById('suggestions-tbody');
+    tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <p>Loading suggestions…</p></div></td></tr>`;
+
+    try {
+      const data = await api('/api/admin/suggestions?page=1&per_page=100');
+      renderSuggestions(data.results || []);
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <p>Error: ${escHtml(err.message)}</p></div></td></tr>`;
+    }
+  }
+
   function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
@@ -606,6 +660,28 @@
             </button>
           </div>
         </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderSuggestions(rows) {
+    const tbody = document.getElementById('suggestions-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <p>No suggestions yet.</p></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td class="td-id">${r.id}</td>
+        <td class="td-en">${escHtml(r.source_word || '')}</td>
+        <td class="td-pos"><span class="pos-badge">${escHtml((r.source_lang || '').toUpperCase() || '—')}</span></td>
+        <td class="td-long" title="${escHtml(r.suggested_definition || '')}">${r.suggested_definition ? escHtml(r.suggested_definition) : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td class="td-long" title="${escHtml(r.notes || '')}">${r.notes ? escHtml(r.notes) : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td class="td-def" title="${escHtml(r.submitter_email || '')}">${r.submitter_name ? escHtml(r.submitter_name) : '<span style="color:var(--text-3)">Anonymous</span>'}${r.submitter_email ? `<br><span style="font-size:.74rem;color:var(--text-3)">${escHtml(r.submitter_email)}</span>` : ''}</td>
+        <td class="td-id">${escHtml((r.created_at || '').slice(0, 10) || '—')}</td>
       </tr>
     `).join('');
   }
@@ -674,7 +750,9 @@
   document.getElementById('refresh-btn').addEventListener('click', () => {
     loadStats();
     loadEntries();
+    loadSuggestions();
   });
+  document.getElementById('refresh-suggestions-btn').addEventListener('click', loadSuggestions);
 
   // ── Entry form modal ───────────────────────────────────────────
   function openAddModal() {
@@ -814,6 +892,7 @@
   // ── Init ───────────────────────────────────────────────────────
   loadStats();
   loadEntries();
+  loadSuggestions();
   </script>
 </body>
 </html>
