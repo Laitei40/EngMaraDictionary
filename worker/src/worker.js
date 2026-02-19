@@ -277,6 +277,37 @@ async function handleWord(url, db, corsHeaders) {
         END
     `).bind(lowerQ).all();
 
+    // Attach meanings from the meanings table to each result
+    if (results.length) {
+      const ids = results.map(r => r.id);
+      const placeholders = ids.map((_, i) => `?${i + 1}`).join(',');
+      const { results: meanings } = await db.prepare(`
+        SELECT id, dictionary_id, part_of_speech, definition, examples, "order"
+        FROM meanings
+        WHERE dictionary_id IN (${placeholders})
+        ORDER BY dictionary_id, "order" ASC, id ASC
+      `).bind(...ids).all();
+
+      // Group meanings by dictionary_id
+      const meaningsMap = new Map();
+      meanings.forEach(m => {
+        if (!meaningsMap.has(m.dictionary_id)) meaningsMap.set(m.dictionary_id, []);
+        let exampleArr = [];
+        if (m.examples) {
+          try { exampleArr = JSON.parse(m.examples); } catch { exampleArr = [m.examples]; }
+        }
+        meaningsMap.get(m.dictionary_id).push({
+          part_of_speech: m.part_of_speech,
+          definition: m.definition,
+          examples: exampleArr,
+        });
+      });
+
+      results.forEach(r => {
+        r.meanings = meaningsMap.get(r.id) || [];
+      });
+    }
+
     // Get related words (same first 3 chars, excluding the exact word)
     const prefix = lowerQ.length >= 3 ? lowerQ.substring(0, 3) : lowerQ;
     const { results: related } = await db.prepare(`
@@ -297,7 +328,7 @@ async function handleWord(url, db, corsHeaders) {
         related: related.map(r => r.word),
       },
       200,
-      { ...corsHeaders, 'Cache-Control': 'public, max-age=300' }
+      { ...corsHeaders, 'Cache-Control': 'public, max-age=60' }
     );
   } catch (err) {
     return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);

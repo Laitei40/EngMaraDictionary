@@ -932,6 +932,29 @@ kbd {
 }
 
 
+/* Numbered meaning list — multiple senses per POS */
+.dict-meaning-list {
+  margin: 4px 0 0 0;
+  padding-left: 1.5rem;
+  list-style: decimal;
+}
+.dict-meaning-item {
+  margin-bottom: 10px;
+  padding-left: 4px;
+  line-height: 1.6;
+}
+.dict-meaning-def {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.5;
+}
+.dict-meaning-item .dict-example {
+  margin-top: 6px;
+  margin-left: -1.5rem;
+}
+
+
 /* ================================================================
    RELATED WORDS — thesaurus / see also
    ================================================================ */

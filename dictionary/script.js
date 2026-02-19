@@ -773,36 +773,92 @@ const UI = (() => {
     html += `  </button>`;
     html += `</div>`;
 
-    // Group by POS — like MyOrdbok's noun/verb/phrase sections
-    const posSections = new Map();
-    results.forEach(entry => {
-      const pos = entry.part_of_speech || 'other';
-      if (!posSections.has(pos)) posSections.set(pos, []);
-      posSections.get(pos).push(entry);
-    });
+    // Build POS sections — meanings-aware or legacy
+    const hasMeanings = results.some(r => r.meanings && r.meanings.length > 0);
 
-    for (const [pos, entries] of posSections) {
-      html += `<div class="dict-pos-section">`;
-      html += `  <h2 class="dict-pos-heading">${_escapeHtml(pos)}</h2>`;
+    if (hasMeanings) {
+      // Group meanings across all results by their own POS
+      const meaningsByPos = new Map();
+      results.forEach(entry => {
+        if (entry.meanings && entry.meanings.length > 0) {
+          entry.meanings.forEach(m => {
+            const pos = m.part_of_speech || entry.part_of_speech || 'other';
+            if (!meaningsByPos.has(pos)) meaningsByPos.set(pos, { entry, items: [] });
+            meaningsByPos.get(pos).items.push({ definition: m.definition, examples: m.examples || [] });
+          });
+        } else {
+          const pos = entry.part_of_speech || 'other';
+          if (!meaningsByPos.has(pos)) meaningsByPos.set(pos, { entry, items: [] });
+          meaningsByPos.get(pos).items.push({
+            definition: entry.definition,
+            examples: entry.example_sentence ? [entry.example_sentence] : [],
+          });
+        }
+      });
 
-      entries.forEach((entry) => {
+      for (const [pos, { entry, items }] of meaningsByPos) {
         const targetWord  = isEnToMara ? entry.mara_word : entry.english_word;
         const targetLabel = isEnToMara ? 'Mara' : 'English';
+
+        html += `<div class="dict-pos-section">`;
+        html += `  <h2 class="dict-pos-heading">${_escapeHtml(pos)}</h2>`;
 
         html += `<div class="dict-translation-block">`;
         html += `  <div class="dict-translation-label">${targetLabel}</div>`;
         html += `  <div class="dict-translation">${_escapeHtml(targetWord)}</div>`;
         html += `</div>`;
 
-        if (entry.definition) {
-          html += `<div class="dict-definition">${_escapeHtml(entry.definition)}</div>`;
+        if (items.length === 1) {
+          const m = items[0];
+          if (m.definition) html += `<div class="dict-definition">${_escapeHtml(m.definition)}</div>`;
+          if (m.examples && m.examples.length) html += `<div class="dict-example">\u201c${_escapeHtml(m.examples[0])}\u201d</div>`;
+        } else {
+          html += `<ol class="dict-meaning-list">`;
+          items.forEach(m => {
+            html += `<li class="dict-meaning-item">`;
+            html += `<span class="dict-meaning-def">${_escapeHtml(m.definition)}</span>`;
+            if (m.examples && m.examples.length) {
+              html += `<div class="dict-example">\u201c${_escapeHtml(m.examples[0])}\u201d</div>`;
+            }
+            html += `</li>`;
+          });
+          html += `</ol>`;
         }
-        if (entry.example_sentence) {
-          html += `<div class="dict-example">\u201c${_escapeHtml(entry.example_sentence)}\u201d</div>`;
-        }
+
+        html += `</div>`;
+      }
+    } else {
+      // Legacy: group by entry.part_of_speech (no meanings table data)
+      const posSections = new Map();
+      results.forEach(entry => {
+        const pos = entry.part_of_speech || 'other';
+        if (!posSections.has(pos)) posSections.set(pos, []);
+        posSections.get(pos).push(entry);
       });
 
-      html += `</div>`;
+      for (const [pos, entries] of posSections) {
+        html += `<div class="dict-pos-section">`;
+        html += `  <h2 class="dict-pos-heading">${_escapeHtml(pos)}</h2>`;
+
+        entries.forEach((entry) => {
+          const targetWord  = isEnToMara ? entry.mara_word : entry.english_word;
+          const targetLabel = isEnToMara ? 'Mara' : 'English';
+
+          html += `<div class="dict-translation-block">`;
+          html += `  <div class="dict-translation-label">${targetLabel}</div>`;
+          html += `  <div class="dict-translation">${_escapeHtml(targetWord)}</div>`;
+          html += `</div>`;
+
+          if (entry.definition) {
+            html += `<div class="dict-definition">${_escapeHtml(entry.definition)}</div>`;
+          }
+          if (entry.example_sentence) {
+            html += `<div class="dict-example">\u201c${_escapeHtml(entry.example_sentence)}\u201d</div>`;
+          }
+        });
+
+        html += `</div>`;
+      }
     }
 
     // Thesaurus / Related words section — grouped by POS like MyOrdbok
