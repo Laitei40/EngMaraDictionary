@@ -243,6 +243,11 @@
             <input id="suggest-email" type="email" placeholder="name@example.com">
           </div>
         </div>
+
+        <div class="suggest-field">
+          <label>Verification <span class="field-required">*</span></label>
+          <div id="suggest-turnstile" class="suggest-turnstile-wrap"></div>
+        </div>
       </div>
       <div class="suggest-modal-footer">
         <button type="button" id="suggest-cancel" class="detail-back-btn">Cancel</button>
@@ -251,6 +256,7 @@
     </div>
   </div>
 
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script src="script.js"></script>
 </body>
 </html>

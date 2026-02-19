@@ -22,6 +22,7 @@
 // ─── Config ──────────────────────────────────────────────────────────
 const Config = Object.freeze({
   API_BASE: 'https://engmaradictionary.teiteipara.workers.dev',
+  TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
 
   DEBOUNCE_MS:        300,
   SUGGEST_DEBOUNCE:   150,
@@ -376,6 +377,8 @@ const UI = (() => {
   let _lastQuery      = '';
   let _suggestIdx     = -1;
   let _suggestContext = null;
+  let _turnstileToken = '';
+  let _turnstileWidgetId = null;
 
   // ── Helpers ──
 
@@ -468,6 +471,35 @@ const UI = (() => {
     if (!$suggestModal) return;
     $suggestModal.classList.add('hidden');
     document.body.style.overflow = '';
+    if (window.turnstile && _turnstileWidgetId !== null) {
+      window.turnstile.reset(_turnstileWidgetId);
+      _turnstileToken = '';
+    }
+  }
+
+  function _ensureTurnstile() {
+    if (!window.turnstile) return;
+    const target = document.getElementById('suggest-turnstile');
+    if (!target) return;
+    if (_turnstileWidgetId !== null) {
+      window.turnstile.reset(_turnstileWidgetId);
+      _turnstileToken = '';
+      return;
+    }
+
+    _turnstileWidgetId = window.turnstile.render('#suggest-turnstile', {
+      sitekey: Config.TURNSTILE_SITE_KEY,
+      theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
+      callback: (token) => {
+        _turnstileToken = token || '';
+      },
+      'expired-callback': () => {
+        _turnstileToken = '';
+      },
+      'error-callback': () => {
+        _turnstileToken = '';
+      },
+    });
   }
 
   function _openSuggestModal(context) {
@@ -501,6 +533,7 @@ const UI = (() => {
 
     $suggestModal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+    _ensureTurnstile();
     definitionInput.focus();
   }
 
@@ -519,6 +552,7 @@ const UI = (() => {
       notes: document.getElementById('suggest-notes').value.trim() || null,
       submitter_name: document.getElementById('suggest-name').value.trim() || null,
       submitter_email: document.getElementById('suggest-email').value.trim() || null,
+      turnstile_token: _turnstileToken,
     };
 
     errEl.classList.add('hidden');
@@ -528,6 +562,12 @@ const UI = (() => {
 
     if (!payload.source_word || !payload.suggested_definition) {
       errEl.textContent = 'Word and suggested meaning are required.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    if (!payload.turnstile_token) {
+      errEl.textContent = 'Please complete Turnstile verification.';
       errEl.classList.remove('hidden');
       return;
     }
@@ -543,6 +583,10 @@ const UI = (() => {
       document.getElementById('suggest-notes').value = '';
       document.getElementById('suggest-name').value = '';
       document.getElementById('suggest-email').value = '';
+      if (window.turnstile && _turnstileWidgetId !== null) {
+        window.turnstile.reset(_turnstileWidgetId);
+        _turnstileToken = '';
+      }
     } catch (err) {
       errEl.textContent = err.message || 'Failed to submit suggestion.';
       errEl.classList.remove('hidden');

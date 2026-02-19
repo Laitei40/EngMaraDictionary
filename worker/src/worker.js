@@ -50,7 +50,7 @@ export default {
       if (request.method !== 'POST') {
         return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
       }
-      return await handleSuggestionSubmit(request, env.DB, corsHeaders);
+      return await handleSuggestionSubmit(request, env, corsHeaders);
     }
 
     // Only allow GET and HEAD for public routes
@@ -395,7 +395,8 @@ async function handleStats(db, corsHeaders) {
  * Save a dictionary improvement suggestion submitted by users.
  * POST /api/suggestions
  */
-async function handleSuggestionSubmit(request, db, corsHeaders) {
+async function handleSuggestionSubmit(request, env, corsHeaders) {
+  const db = env.DB;
   let body;
   try {
     body = await request.json();
@@ -412,9 +413,14 @@ async function handleSuggestionSubmit(request, db, corsHeaders) {
   const notes = String(body.notes || '').trim() || null;
   const submitter_name = String(body.submitter_name || '').trim() || null;
   const submitter_email = String(body.submitter_email || '').trim() || null;
+  const turnstile_token = String(body.turnstile_token || '').trim();
 
   if (!source_word || !suggested_definition) {
     return jsonResponse({ error: 'source_word and suggested_definition are required' }, 400, corsHeaders);
+  }
+
+  if (!turnstile_token) {
+    return jsonResponse({ error: 'Missing Turnstile token' }, 400, corsHeaders);
   }
 
   if (source_lang !== 'en' && source_lang !== 'mrh') {
@@ -427,6 +433,20 @@ async function handleSuggestionSubmit(request, db, corsHeaders) {
 
   if (submitter_email && !/^\S+@\S+\.\S+$/.test(submitter_email)) {
     return jsonResponse({ error: 'Invalid email format' }, 400, corsHeaders);
+  }
+
+  const turnstileSecret = env.TURNSTILE_SECRET;
+  if (!turnstileSecret) {
+    return jsonResponse({ error: 'Turnstile is not configured on server' }, 500, corsHeaders);
+  }
+
+  const clientIp = request.headers.get('CF-Connecting-IP') || undefined;
+  const turnstileCheck = await verifyTurnstile(turnstile_token, turnstileSecret, clientIp);
+  if (!turnstileCheck.success) {
+    return jsonResponse({
+      error: 'Turnstile verification failed',
+      details: turnstileCheck['error-codes'] || [],
+    }, 400, corsHeaders);
   }
 
   try {
@@ -455,6 +475,32 @@ async function handleSuggestionSubmit(request, db, corsHeaders) {
     }, 201, corsHeaders);
   } catch (err) {
     return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+  }
+}
+
+/**
+ * Verify Turnstile token via Cloudflare siteverify.
+ */
+async function verifyTurnstile(token, secret, remoteip) {
+  try {
+    const form = new URLSearchParams();
+    form.set('secret', secret);
+    form.set('response', token);
+    if (remoteip) form.set('remoteip', remoteip);
+
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+    });
+
+    if (!res.ok) {
+      return { success: false, 'error-codes': ['turnstile-siteverify-http-error'] };
+    }
+
+    return await res.json();
+  } catch {
+    return { success: false, 'error-codes': ['turnstile-siteverify-network-error'] };
   }
 }
 
