@@ -8,6 +8,7 @@
  *   GET /api/browse?letter=<A-Z>&lang=en|mrh&page=1 — Browse words alphabetically
  *   GET /api/stats                                  — Dictionary statistics
  *   GET /api/health                                 — Health check
+ *   GET /api/public-config                          — Public frontend config
  *   POST /api/suggestions                            — Submit word improvement suggestion
  *
  * Admin CRUD Endpoints (protected by Cloudflare Access):
@@ -82,6 +83,12 @@ export default {
 
       if (url.pathname === '/api/health') {
         return jsonResponse({ status: 'ok', timestamp: new Date().toISOString() }, 200, corsHeaders);
+      }
+
+      if (url.pathname === '/api/public-config') {
+        return jsonResponse({
+          turnstile_site_key: env.TURNSTILE_SITE_KEY || '',
+        }, 200, { ...corsHeaders, 'Cache-Control': 'public, max-age=300' });
       }
 
       // Serve a simple test page at root

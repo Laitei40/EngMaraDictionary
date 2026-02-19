@@ -4,6 +4,9 @@ compatibility_date = "2024-12-01"
 
 # Required for suggestion form protection:
 # npx wrangler secret put TURNSTILE_SECRET
+# Set your real Turnstile site key as a Worker variable (not secret):
+# [vars]
+# TURNSTILE_SITE_KEY = "0x4AAAAA..."
 
 # ── D1 Database Binding ──
 # After creating your D1 database, paste the real database_id below.

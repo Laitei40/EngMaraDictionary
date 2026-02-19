@@ -22,7 +22,6 @@
 // ─── Config ──────────────────────────────────────────────────────────
 const Config = Object.freeze({
   API_BASE: 'https://engmaradictionary.teiteipara.workers.dev',
-  TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
 
   DEBOUNCE_MS:        300,
   SUGGEST_DEBOUNCE:   150,
@@ -239,7 +238,16 @@ const API = (() => {
     return data;
   }
 
-  return { search, suggest, word, browse, submitSuggestion };
+  async function publicConfig() {
+    const res = await fetch(`${Config.API_BASE}/api/public-config`, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return {};
+    return await res.json();
+  }
+
+  return { search, suggest, word, browse, submitSuggestion, publicConfig };
 })();
 
 
@@ -379,6 +387,7 @@ const UI = (() => {
   let _suggestContext = null;
   let _turnstileToken = '';
   let _turnstileWidgetId = null;
+  let _turnstileSiteKey = '';
 
   // ── Helpers ──
 
@@ -477,7 +486,25 @@ const UI = (() => {
     }
   }
 
-  function _ensureTurnstile() {
+  async function _ensureTurnstile() {
+    if (!_turnstileSiteKey) {
+      try {
+        const cfg = await API.publicConfig();
+        _turnstileSiteKey = String(cfg.turnstile_site_key || '').trim();
+      } catch {
+        _turnstileSiteKey = '';
+      }
+    }
+
+    if (!_turnstileSiteKey) {
+      const errEl = document.getElementById('suggest-error');
+      if (errEl) {
+        errEl.textContent = 'Verification is not configured. Please try again later.';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+
     if (!window.turnstile) return;
     const target = document.getElementById('suggest-turnstile');
     if (!target) return;
@@ -488,7 +515,7 @@ const UI = (() => {
     }
 
     _turnstileWidgetId = window.turnstile.render('#suggest-turnstile', {
-      sitekey: Config.TURNSTILE_SITE_KEY,
+      sitekey: _turnstileSiteKey,
       theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
       callback: (token) => {
         _turnstileToken = token || '';
@@ -533,7 +560,7 @@ const UI = (() => {
 
     $suggestModal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
-    _ensureTurnstile();
+    void _ensureTurnstile();
     definitionInput.focus();
   }
 
