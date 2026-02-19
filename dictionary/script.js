@@ -784,7 +784,7 @@ const UI = (() => {
           entry.meanings.forEach(m => {
             const pos = m.part_of_speech || entry.part_of_speech || 'other';
             if (!meaningsByPos.has(pos)) meaningsByPos.set(pos, { entry, items: [] });
-            meaningsByPos.get(pos).items.push({ definition: m.definition, examples: m.examples || [] });
+            meaningsByPos.get(pos).items.push({ definition: m.definition, examples: m.examples || [], synonyms: m.synonyms || [], antonyms: m.antonyms || [] });
           });
         } else {
           const pos = entry.part_of_speech || 'other';
@@ -812,6 +812,16 @@ const UI = (() => {
           const m = items[0];
           if (m.definition) html += `<div class="dict-definition">${_escapeHtml(m.definition)}</div>`;
           if (m.examples && m.examples.length) html += `<div class="dict-example">\u201c${_escapeHtml(m.examples[0])}\u201d</div>`;
+          if (m.synonyms && m.synonyms.length) {
+            html += `<div class="dict-syn-row"><span class="dict-syn-label">Similar:</span>`;
+            m.synonyms.forEach(s => { html += `<button class="dict-syn-chip" data-word="${_escapeHtml(s)}">${_escapeHtml(s)}</button>`; });
+            html += `</div>`;
+          }
+          if (m.antonyms && m.antonyms.length) {
+            html += `<div class="dict-syn-row dict-ant-row"><span class="dict-syn-label">Opposite:</span>`;
+            m.antonyms.forEach(s => { html += `<button class="dict-ant-chip" data-word="${_escapeHtml(s)}">${_escapeHtml(s)}</button>`; });
+            html += `</div>`;
+          }
         } else {
           html += `<ol class="dict-meaning-list">`;
           items.forEach(m => {
@@ -819,6 +829,16 @@ const UI = (() => {
             html += `<span class="dict-meaning-def">${_escapeHtml(m.definition)}</span>`;
             if (m.examples && m.examples.length) {
               html += `<div class="dict-example">\u201c${_escapeHtml(m.examples[0])}\u201d</div>`;
+            }
+            if (m.synonyms && m.synonyms.length) {
+              html += `<div class="dict-syn-row"><span class="dict-syn-label">Similar:</span>`;
+              m.synonyms.forEach(s => { html += `<button class="dict-syn-chip" data-word="${_escapeHtml(s)}">${_escapeHtml(s)}</button>`; });
+              html += `</div>`;
+            }
+            if (m.antonyms && m.antonyms.length) {
+              html += `<div class="dict-syn-row dict-ant-row"><span class="dict-syn-label">Opposite:</span>`;
+              m.antonyms.forEach(s => { html += `<button class="dict-ant-chip" data-word="${_escapeHtml(s)}">${_escapeHtml(s)}</button>`; });
+              html += `</div>`;
             }
             html += `</li>`;
           });
@@ -902,6 +922,15 @@ const UI = (() => {
 
     // Wire related word clicks
     $resultsContainer.querySelectorAll('.dict-related-word').forEach(btn => {
+      btn.addEventListener('click', () => {
+        $searchInput.value = btn.dataset.word;
+        _lastQuery = '';
+        _executeSearch(btn.dataset.word, true);
+      });
+    });
+
+    // Wire synonym / antonym chip clicks
+    $resultsContainer.querySelectorAll('.dict-syn-chip, .dict-ant-chip').forEach(btn => {
       btn.addEventListener('click', () => {
         $searchInput.value = btn.dataset.word;
         _lastQuery = '';

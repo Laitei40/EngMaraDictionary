@@ -192,6 +192,10 @@
     .meaning-remove-btn { width:28px; height:28px; border-radius:var(--radius-sm); border:1px solid var(--border); background:transparent; color:var(--red); cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:all var(--transition); }
     .meaning-remove-btn:hover { background:var(--red-bg); border-color:var(--red); }
     .mc-definition, .mc-example { width:100%; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text); padding:.5rem .625rem; font-size:.875rem; resize:vertical; transition:border-color var(--transition); }
+    .mc-syn-row { display:flex; flex-direction:column; gap:.25rem; }
+    .mc-syn-label { font-size:.75rem; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.04em; }
+    .mc-synonyms, .mc-antonyms { width:100%; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text); padding:.4rem .625rem; font-size:.85rem; transition:border-color var(--transition); }
+    .mc-synonyms:focus, .mc-antonyms:focus { outline:none; border-color:var(--border-focus); box-shadow:var(--ring); }
     .mc-definition { margin-bottom:.5rem; min-height:60px; }
     .mc-example { min-height:50px; }
     .mc-definition:focus, .mc-example:focus { outline:none; border-color:var(--border-focus); box-shadow:var(--ring); }
@@ -779,9 +783,19 @@
       </div>
       <textarea class="mc-definition" rows="2" placeholder="Definition or meaning…"></textarea>
       <textarea class="mc-example" rows="2" placeholder="Example sentence (optional)…"></textarea>
+      <div class="mc-syn-row">
+        <span class="mc-syn-label">Synonyms (comma-separated)</span>
+        <input class="mc-synonyms" type="text" placeholder="e.g. glad, joyful…">
+      </div>
+      <div class="mc-syn-row">
+        <span class="mc-syn-label">Antonyms / Opposites (comma-separated)</span>
+        <input class="mc-antonyms" type="text" placeholder="e.g. sad, unhappy…">
+      </div>
     `;
     card.querySelector('.mc-definition').value = vals.definition || '';
     card.querySelector('.mc-example').value = vals.example || '';
+    card.querySelector('.mc-synonyms').value = Array.isArray(vals.synonyms) ? vals.synonyms.join(', ') : (vals.synonyms || '');
+    card.querySelector('.mc-antonyms').value = Array.isArray(vals.antonyms) ? vals.antonyms.join(', ') : (vals.antonyms || '');
     card.querySelector('.meaning-remove-btn').addEventListener('click', () => {
       card.remove();
       renumberMeanings();
@@ -847,7 +861,10 @@
         res.results.forEach(m => {
           let ex = '';
           if (m.examples) { try { const a = JSON.parse(m.examples); ex = Array.isArray(a) ? (a[0] || '') : m.examples; } catch { ex = m.examples; } }
-          addMeaningCard({ pos: m.part_of_speech || '', definition: m.definition || '', example: ex });
+          addMeaningCard({ pos: m.part_of_speech || '', definition: m.definition || '', example: ex,
+            synonyms: m.synonyms ? (() => { try { const a = JSON.parse(m.synonyms); return Array.isArray(a) ? a : []; } catch { return []; } })() : [],
+            antonyms: m.antonyms ? (() => { try { const a = JSON.parse(m.antonyms); return Array.isArray(a) ? a : []; } catch { return []; } })() : [],
+          });
         });
       } else {
         // Fall back to the inline data from the table row
@@ -880,6 +897,8 @@
       part_of_speech: card.querySelector('.mc-pos').value.trim() || null,
       definition:     card.querySelector('.mc-definition').value.trim(),
       example:        card.querySelector('.mc-example').value.trim() || null,
+      synonyms:       card.querySelector('.mc-synonyms').value.split(',').map(s => s.trim()).filter(Boolean),
+      antonyms:       card.querySelector('.mc-antonyms').value.split(',').map(s => s.trim()).filter(Boolean),
     })).filter(m => m.definition);
 
     if (!meanings.length) {

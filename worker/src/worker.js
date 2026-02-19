@@ -282,7 +282,7 @@ async function handleWord(url, db, corsHeaders) {
       const ids = results.map(r => r.id);
       const placeholders = ids.map((_, i) => `?${i + 1}`).join(',');
       const { results: meanings } = await db.prepare(`
-        SELECT id, dictionary_id, part_of_speech, definition, examples, "order"
+        SELECT id, dictionary_id, part_of_speech, definition, examples, synonyms, antonyms, "order"
         FROM meanings
         WHERE dictionary_id IN (${placeholders})
         ORDER BY dictionary_id, "order" ASC, id ASC
@@ -296,10 +296,20 @@ async function handleWord(url, db, corsHeaders) {
         if (m.examples) {
           try { exampleArr = JSON.parse(m.examples); } catch { exampleArr = [m.examples]; }
         }
+        let synArr = [];
+        if (m.synonyms) {
+          try { synArr = JSON.parse(m.synonyms); } catch { synArr = [m.synonyms]; }
+        }
+        let antArr = [];
+        if (m.antonyms) {
+          try { antArr = JSON.parse(m.antonyms); } catch { antArr = [m.antonyms]; }
+        }
         meaningsMap.get(m.dictionary_id).push({
           part_of_speech: m.part_of_speech,
           definition: m.definition,
           examples: exampleArr,
+          synonyms: synArr,
+          antonyms: antArr,
         });
       });
 
@@ -613,7 +623,7 @@ async function handleAdmin(request, url, env, corsHeaders) {
     const id = parseInt(meaningsGetMatch[1], 10);
     try {
       const { results } = await db.prepare(`
-        SELECT id, part_of_speech, definition, examples, "order"
+        SELECT id, part_of_speech, definition, examples, synonyms, antonyms, "order"
         FROM meanings
         WHERE dictionary_id = ?1
         ORDER BY "order" ASC, id ASC
@@ -713,9 +723,11 @@ async function handleAdmin(request, url, env, corsHeaders) {
           const m = meaningsList[i];
           if (!m.definition?.trim()) continue;
           const exJson = m.example?.trim() ? JSON.stringify([m.example.trim()]) : null;
+          const synJson = Array.isArray(m.synonyms) && m.synonyms.length ? JSON.stringify(m.synonyms) : null;
+          const antJson = Array.isArray(m.antonyms) && m.antonyms.length ? JSON.stringify(m.antonyms) : null;
           await db.prepare(
-            `INSERT INTO meanings (dictionary_id, part_of_speech, definition, examples, "order") VALUES (?1, ?2, ?3, ?4, ?5)`
-          ).bind(entryId, m.part_of_speech?.trim() || null, m.definition.trim(), exJson, i).run();
+            `INSERT INTO meanings (dictionary_id, part_of_speech, definition, examples, synonyms, antonyms, "order") VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`
+          ).bind(entryId, m.part_of_speech?.trim() || null, m.definition.trim(), exJson, synJson, antJson, i).run();
         }
       }
 
@@ -769,9 +781,11 @@ async function handleAdmin(request, url, env, corsHeaders) {
           const m = meaningsList[i];
           if (!m.definition?.trim()) continue;
           const exJson = m.example?.trim() ? JSON.stringify([m.example.trim()]) : null;
+          const synJson = Array.isArray(m.synonyms) && m.synonyms.length ? JSON.stringify(m.synonyms) : null;
+          const antJson = Array.isArray(m.antonyms) && m.antonyms.length ? JSON.stringify(m.antonyms) : null;
           await db.prepare(
-            `INSERT INTO meanings (dictionary_id, part_of_speech, definition, examples, "order") VALUES (?1, ?2, ?3, ?4, ?5)`
-          ).bind(id, m.part_of_speech?.trim() || null, m.definition.trim(), exJson, i).run();
+            `INSERT INTO meanings (dictionary_id, part_of_speech, definition, examples, synonyms, antonyms, "order") VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`
+          ).bind(id, m.part_of_speech?.trim() || null, m.definition.trim(), exJson, synJson, antJson, i).run();
         }
       }
 
