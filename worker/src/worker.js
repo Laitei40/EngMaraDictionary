@@ -17,6 +17,8 @@
  *   PUT    /api/admin/entries/:id                   — Update an existing entry
  *   DELETE /api/admin/entries/:id                   — Delete an entry
  *   GET    /api/admin/suggestions                   — List user suggestions
+ *   PATCH  /api/admin/suggestions/:id              — Update suggestion fields / status
+ *   DELETE /api/admin/suggestions/:id              — Delete a suggestion
  *
  * Binds to a Cloudflare D1 database named DB.
  * Set the ADMIN_KEY secret:  npx wrangler secret put ADMIN_KEY
@@ -806,6 +808,73 @@ async function handleAdmin(request, url, env, corsHeaders) {
         return jsonResponse({ error: 'Entry not found' }, 404, corsHeaders);
       }
       await db.prepare('DELETE FROM dictionary WHERE id = ?1').bind(id).run();
+      return jsonResponse({ success: true, deleted_id: id }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
+  // PATCH /api/admin/suggestions/:id — update suggestion fields / status
+  const suggPatchMatch = url.pathname.match(/^\/api\/admin\/suggestions\/(\d+)$/);
+  if (suggPatchMatch && method === 'PATCH') {
+    const id = parseInt(suggPatchMatch[1], 10);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400, corsHeaders);
+    }
+
+    try {
+      const existing = await db.prepare('SELECT * FROM suggestions WHERE id = ?1').bind(id).first();
+      if (!existing) {
+        return jsonResponse({ error: 'Suggestion not found' }, 404, corsHeaders);
+      }
+
+      const VALID_STATUSES = ['new', 'pending', 'approved', 'rejected'];
+      const status = body.status !== undefined ? String(body.status).trim().toLowerCase() : existing.status;
+      if (!VALID_STATUSES.includes(status)) {
+        return jsonResponse({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` }, 400, corsHeaders);
+      }
+
+      const source_word          = body.source_word !== undefined          ? String(body.source_word).trim()          : existing.source_word;
+      const source_lang          = body.source_lang !== undefined          ? String(body.source_lang).trim().toLowerCase() : existing.source_lang;
+      const suggested_definition = body.suggested_definition !== undefined ? String(body.suggested_definition).trim() : existing.suggested_definition;
+      const notes                = body.notes !== undefined                ? (String(body.notes).trim() || null)       : existing.notes;
+      const submitter_name       = body.submitter_name !== undefined       ? (String(body.submitter_name).trim() || null)  : existing.submitter_name;
+      const submitter_email      = body.submitter_email !== undefined      ? (String(body.submitter_email).trim() || null) : existing.submitter_email;
+
+      if (!source_word || !suggested_definition) {
+        return jsonResponse({ error: 'source_word and suggested_definition are required' }, 400, corsHeaders);
+      }
+      if (source_lang !== 'en' && source_lang !== 'mrh') {
+        return jsonResponse({ error: 'Invalid source_lang. Use "en" or "mrh".' }, 400, corsHeaders);
+      }
+
+      await db.prepare(`
+        UPDATE suggestions
+        SET source_word = ?1, source_lang = ?2, suggested_definition = ?3,
+            notes = ?4, submitter_name = ?5, submitter_email = ?6, status = ?7
+        WHERE id = ?8
+      `).bind(source_word, source_lang, suggested_definition, notes, submitter_name, submitter_email, status, id).run();
+
+      const updated = await db.prepare('SELECT * FROM suggestions WHERE id = ?1').bind(id).first();
+      return jsonResponse({ success: true, suggestion: updated }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
+  // DELETE /api/admin/suggestions/:id — delete a suggestion
+  const suggDeleteMatch = url.pathname.match(/^\/api\/admin\/suggestions\/(\d+)$/);
+  if (suggDeleteMatch && method === 'DELETE') {
+    const id = parseInt(suggDeleteMatch[1], 10);
+    try {
+      const existing = await db.prepare('SELECT id FROM suggestions WHERE id = ?1').bind(id).first();
+      if (!existing) {
+        return jsonResponse({ error: 'Suggestion not found' }, 404, corsHeaders);
+      }
+      await db.prepare('DELETE FROM suggestions WHERE id = ?1').bind(id).run();
       return jsonResponse({ success: true, deleted_id: id }, 200, corsHeaders);
     } catch (err) {
       return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
