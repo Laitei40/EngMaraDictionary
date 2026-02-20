@@ -173,12 +173,18 @@
     </div>
   </main>
 
+  <!-- ── Back to Top ── -->
+  <a href="#" class="back-to-top" aria-label="Back to top" title="Back to top">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg>
+  </a>
+
   <!-- ── Footer ── -->
   <footer class="footer" role="contentinfo">
     <div class="container">
-      <div class="footer-grid">
-        <div class="footer-col footer-col-brand">
-          <div class="footer-brand">
+      <div class="footer-inner">
+        <!-- Brand -->
+        <div class="footer-brand-col">
+          <div class="footer-logo" aria-label="MaraDict">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
               <path d="M8 7h6"/><path d="M8 11h8"/>
@@ -186,35 +192,51 @@
             <span>MaraDict</span>
           </div>
           <p class="footer-tagline">Preserving and celebrating the Mara&nbsp;(Lakher) language &mdash; a Kuki-Chin language spoken in Mizoram, India &amp;&nbsp;Chin&nbsp;State, Myanmar.</p>
-          <a href="https://github.com/Laitei40/EngMaraDictionary" class="footer-github-link" target="_blank" rel="noopener noreferrer" aria-label="View MaraDict on GitHub">
+          <div class="footer-social">
+            <a href="https://github.com/Laitei40/EngMaraDictionary" class="footer-social-btn" target="_blank" rel="noopener noreferrer" aria-label="View project on GitHub">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+            </a>
+            <a href="/contact.html" class="footer-social-btn" aria-label="Contact Us">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            </a>
+          </div>
+          <a href="https://github.com/Laitei40/EngMaraDictionary" class="footer-github-btn" target="_blank" rel="noopener noreferrer" aria-label="View MaraDict on GitHub">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
             View on GitHub
           </a>
         </div>
-        <div class="footer-col">
-          <p class="footer-col-title">Navigation</p>
-          <ul class="footer-col-links">
-            <li><a href="/">Home</a></li>
-            <li><a href="/about.html">About</a></li>
-            <li><a href="https://github.com/Laitei40/EngMaraDictionary" target="_blank" rel="noopener">GitHub</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <p class="footer-col-title">Legal &amp; Info</p>
-          <ul class="footer-col-links">
-            <li><a href="/contact.html">Contact Us</a></li>
-            <li><a href="/privacy.html">Privacy Policy</a></li>
-            <li><a href="/terms.html">Terms of Use</a></li>
-            <li><a href="/links-disclaimer.html">External Links Disclaimer</a></li>
-          </ul>
+        <!-- Link groups -->
+        <div class="footer-links-grid">
+          <div class="footer-link-group">
+            <p class="footer-group-title">Navigation</p>
+            <ul>
+              <li><a href="/">Home</a></li>
+              <li><a href="/about.html">About</a></li>
+              <li><a href="https://github.com/Laitei40/EngMaraDictionary" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+            </ul>
+          </div>
+          <div class="footer-link-group">
+            <p class="footer-group-title">Legal</p>
+            <ul>
+              <li><a href="/privacy.html">Privacy Policy</a></li>
+              <li><a href="/terms.html">Terms of Use</a></li>
+              <li><a href="/links-disclaimer.html">External Links Disclaimer</a></li>
+            </ul>
+          </div>
+          <div class="footer-link-group">
+            <p class="footer-group-title">Support</p>
+            <ul>
+              <li><a href="/contact.html">Contact Us</a></li>
+            </ul>
+          </div>
         </div>
       </div>
+      <div class="footer-divider"></div>
       <div class="footer-bottom">
-        <p class="footer-copy">&copy; 2026 MaraDict. All rights reserved.</p>
-        <div class="footer-badges">
-          <span class="footer-badge">Mara Language</span>
-          <span class="footer-badge">Kuki-Chin</span>
-        </div>
+        <p class="footer-copy">
+          <span class="desktop-copy">&copy; 2026 <a href="https://marareih.org" target="_blank" rel="noopener noreferrer">Mara Language Preservation (MLP)</a>. All rights reserved.</span>
+          <span class="mobile-copy">&copy; 2026 <a href="https://marareih.org" target="_blank" rel="noopener noreferrer">MLP</a>. All rights reserved.</span>
+        </p>
       </div>
     </div>
   </footer>
