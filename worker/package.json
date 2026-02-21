@@ -7,7 +7,11 @@
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create mara-dictionary",
     "db:schema": "wrangler d1 execute mara-dictionary --file=./schema.sql",
-    "db:seed": "wrangler d1 execute mara-dictionary --file=./seed.sql",    "db:seed:updated": "wrangler d1 execute mara-dictionary --file=./seed_updated.sql",    "db:schema:remote": "wrangler d1 execute mara-dictionary --remote --file=./schema.sql",
+    "db:seed": "wrangler d1 execute mara-dictionary --file=./seed.sql",
+    "db:seed:updated": "wrangler d1 execute mara-dictionary --file=./seed_updated.sql",
+    "db:migrate:004": "wrangler d1 execute mara-dictionary --file=./migrations/004_editorial_workflow.sql",
+    "db:migrate:004:remote": "wrangler d1 execute mara-dictionary --remote --file=./migrations/004_editorial_workflow.sql",
+    "db:schema:remote": "wrangler d1 execute mara-dictionary --remote --file=./schema.sql",
     "db:seed:remote": "wrangler d1 execute mara-dictionary --remote --file=./seed.sql"
   },
   "devDependencies": {

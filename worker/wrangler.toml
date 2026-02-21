@@ -6,6 +6,9 @@ compatibility_date = "2024-12-01"
 # npx wrangler secret put TURNSTILE_SECRET
 # TURNSTILE_SITE_KEY is set as a plain variable in the Cloudflare Dashboard
 
+# Required for GitHub canonical archive:
+# npx wrangler secret put GITHUB_TOKEN
+
 # ── D1 Database Binding ──
 # After creating your D1 database, paste the real database_id below.
 # Run:  npx wrangler d1 create mara-dictionary
