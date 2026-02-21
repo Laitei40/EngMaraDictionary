@@ -309,6 +309,12 @@ const ThemeToggle = (() => {
     const fSvg = document.getElementById('favicon-svg');
     if (fIco) fIco.href = `/favicon_${theme === 'dark' ? 'dark' : 'light'}.ico`;
     if (fSvg) fSvg.href = `/favicon_${theme === 'dark' ? 'dark' : 'light'}.svg`;
+    // Swap logos
+    const logoSrc = `/favicon_${theme === 'dark' ? 'dark' : 'light'}.svg`;
+    const nLogo = document.getElementById('nav-logo-img');
+    const fLogo = document.getElementById('footer-logo-img');
+    if (nLogo) nLogo.src = logoSrc;
+    if (fLogo) fLogo.src = logoSrc;
   }
 
   function toggle() {

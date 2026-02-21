@@ -218,11 +218,6 @@ input, button { font-size: inherit; }
   display: block;
 }
 
-/* Theme-aware logo visibility */
-.nav-logo-dark { display: none; }
-[data-theme="dark"] .nav-logo-light { display: none; }
-[data-theme="dark"] .nav-logo-dark { display: block; }
-
 .topnav-actions {
   display: flex;
   align-items: center;

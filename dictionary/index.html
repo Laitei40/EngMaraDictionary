@@ -22,6 +22,10 @@
       var fSvg = document.getElementById('favicon-svg');
       if (fIco) fIco.href = dark ? '/favicon_dark.ico' : '/favicon_light.ico';
       if (fSvg) fSvg.href = dark ? '/favicon_dark.svg' : '/favicon_light.svg';
+      var nLogo = document.getElementById('nav-logo-img');
+      var fLogo = document.getElementById('footer-logo-img');
+      if (nLogo) nLogo.src = dark ? '/favicon_dark.svg' : '/favicon_light.svg';
+      if (fLogo) fLogo.src = dark ? '/favicon_dark.svg' : '/favicon_light.svg';
     })();
   </script>
 </head>
@@ -32,8 +36,7 @@
     <div class="container topnav-inner">
       <a href="/" class="topnav-brand">
         <div class="topnav-logo">
-          <img class="nav-logo-light" src="/favicon_light.svg" alt="Haolei logo" width="34" height="34">
-          <img class="nav-logo-dark" src="/favicon_dark.svg" alt="Haolei logo" width="34" height="34">
+          <img id="nav-logo-img" src="/favicon_light.svg" alt="Haolei logo" width="34" height="34">
         </div>
         <span class="topnav-name">Haolei</span>
       </a>
@@ -176,8 +179,7 @@
         <!-- Brand -->
         <div class="footer-brand-col">
           <div class="footer-logo" aria-label="Haolei">
-            <img class="footer-logo-img nav-logo-light" src="/favicon_light.svg" alt="Haolei logo" width="30" height="30">
-            <img class="footer-logo-img nav-logo-dark" src="/favicon_dark.svg" alt="Haolei logo" width="30" height="30">
+            <img id="footer-logo-img" class="footer-logo-img" src="/favicon_light.svg" alt="Haolei logo" width="30" height="30">
             <span>Haolei</span>
           </div>
           <p class="footer-tagline">Preserving and celebrating the Mara&nbsp;(Lakher) language &mdash; a Kuki-Chin language spoken in Mizoram, India &amp;&nbsp;Chin&nbsp;State, Myanmar.</p>
