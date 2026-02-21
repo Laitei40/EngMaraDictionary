@@ -206,11 +206,22 @@ input, button { font-size: inherit; }
   justify-content: center;
   width: 34px;
   height: 34px;
-  background: var(--accent);
-  color: #fff;
   border-radius: var(--radius-sm);
+  overflow: hidden;
   flex-shrink: 0;
 }
+
+.topnav-logo img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  display: block;
+}
+
+/* Theme-aware logo visibility */
+.nav-logo-dark { display: none; }
+[data-theme="dark"] .nav-logo-light { display: none; }
+[data-theme="dark"] .nav-logo-dark { display: block; }
 
 .topnav-actions {
   display: flex;
@@ -1607,7 +1618,12 @@ kbd {
   letter-spacing: -0.01em;
 }
 
-.footer-logo svg { color: #60a5fa; flex-shrink: 0; }
+.footer-logo-img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
 
 .footer-tagline {
   font-size: 13px;
