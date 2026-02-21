@@ -6,8 +6,15 @@ compatibility_date = "2024-12-01"
 # npx wrangler secret put TURNSTILE_SECRET
 # TURNSTILE_SITE_KEY is set as a plain variable in the Cloudflare Dashboard
 
-# Required for GitHub canonical archive:
-# npx wrangler secret put GITHUB_TOKEN
+# Required for GitHub canonical archive (Glottolog-style sync):
+# npx wrangler secret put GITHUB_TOKEN        ← PAT with repo:write scope
+#
+# Optional — override defaults via Cloudflare dashboard (Workers > Settings > Variables):
+#   GITHUB_OWNER        default: Laitei40
+#   GITHUB_REPO         default: EngMaraDictionary
+#   GITHUB_BRANCH       default: main
+#   GITHUB_SQL_PATH     default: worker/seed_updated.sql
+#   GITHUB_JSON_PATH    default: worker/dictionary-data.json
 
 # ── D1 Database Binding ──
 # After creating your D1 database, paste the real database_id below.

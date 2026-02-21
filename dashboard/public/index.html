@@ -233,6 +233,30 @@
     /* ── URL modal ── */
     .url-modal { max-width:400px; }
 
+    /* ── GitHub Sync Panel ── */
+    .github-panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:1.5rem; margin-top:2rem; }
+    .github-panel-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.75rem; margin-bottom:1.25rem; }
+    .github-panel-head h2 { display:flex; align-items:center; gap:.5rem; font-size:1rem; font-weight:700; margin:0; }
+    .github-badge { display:inline-flex; align-items:center; padding:.2rem .6rem; border-radius:var(--radius-full); font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .github-badge.connected { background:var(--green-bg); color:var(--green); border:1px solid var(--green); }
+    .github-badge.disconnected { background:var(--orange-bg); color:var(--orange); border:1px solid var(--orange); }
+    .github-badge.error { background:var(--red-bg); color:var(--red); border:1px solid var(--red); }
+    .github-meta { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.75rem; margin-bottom:1.25rem; }
+    .github-meta-item { background:var(--bg-subtle); border-radius:var(--radius-md); padding:.75rem 1rem; }
+    .github-meta-label { font-size:.7rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); margin-bottom:.3rem; }
+    .github-meta-value { font-size:.85rem; font-weight:500; color:var(--text); word-break:break-all; }
+    .github-meta-value a { color:var(--accent); }
+    .sha-chip { font-family:monospace; font-size:.8em; background:var(--bg-inset); padding:.1rem .35rem; border-radius:3px; color:var(--text-2); }
+    .github-actions { display:flex; gap:.75rem; flex-wrap:wrap; align-items:center; }
+    .btn-publish { background:var(--green); color:#fff !important; border:1px solid var(--green); }
+    .btn-publish:hover:not(:disabled) { filter:brightness(1.1); }
+    .btn-publish:disabled { opacity:.5; cursor:not-allowed; }
+    .github-log { margin-top:1rem; background:var(--bg-inset); border-radius:var(--radius-md); padding:.75rem 1rem; font-size:.8rem; color:var(--text-2); max-height:130px; overflow-y:auto; display:none; }
+    .github-log p { margin:0; line-height:1.7; }
+    .github-log p+p { margin-top:.2rem; padding-top:.2rem; border-top:1px solid var(--border-light); }
+    .github-log.visible { display:block; }
+    .gh-last-action { font-size:.78rem; color:var(--text-3); }
+
     /* ── Responsive ── */
     @media (max-width:640px) {
       .stats-grid { grid-template-columns:1fr 1fr; }
@@ -298,12 +322,12 @@
             <div class="stat-label">Unique Mara</div>
             <div class="stat-value skeleton" style="width:50px;height:2rem" id="stat-mrh">&nbsp;</div>
           </div>
-          <div class="stat-card">
-            <div class="stat-label">With Definition</div>
+          <div class="stat-card green">
+            <div class="stat-label">Approved</div>
             <div class="stat-value skeleton" style="width:50px;height:2rem" id="stat-def">&nbsp;</div>
           </div>
           <div class="stat-card orange">
-            <div class="stat-label">With Example</div>
+            <div class="stat-label">Pending</div>
             <div class="stat-value skeleton" style="width:50px;height:2rem" id="stat-ex">&nbsp;</div>
           </div>
         </div>
@@ -391,6 +415,56 @@
               </tbody>
             </table>
           </div>
+        </div>
+
+      </div>
+
+        <!-- ── GitHub Sync Panel ── -->
+        <div class="github-panel" id="github-panel">
+          <div class="github-panel-head">
+            <h2>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+              GitHub Sync
+              <span class="github-badge disconnected" id="github-status-badge">Checking…</span>
+            </h2>
+            <button class="btn btn-ghost" id="github-refresh-btn" title="Refresh GitHub status">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Refresh Status
+            </button>
+          </div>
+
+          <div class="github-meta">
+            <div class="github-meta-item">
+              <div class="github-meta-label">Repository</div>
+              <div class="github-meta-value" id="gh-repo">—</div>
+            </div>
+            <div class="github-meta-item">
+              <div class="github-meta-label">Last Commit</div>
+              <div class="github-meta-value" id="gh-commit">—</div>
+            </div>
+            <div class="github-meta-item">
+              <div class="github-meta-label">Author &amp; Date</div>
+              <div class="github-meta-value" id="gh-author">—</div>
+            </div>
+            <div class="github-meta-item">
+              <div class="github-meta-label">Live D1 Entries</div>
+              <div class="github-meta-value" id="gh-db-count">—</div>
+            </div>
+          </div>
+
+          <div class="github-actions">
+            <button class="btn btn-primary" id="github-sync-btn" title="Export entire dictionary to GitHub now">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 17 21 12 16 7"/><path d="M21 12H9"/><path d="M9 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/></svg>
+              Sync to GitHub
+            </button>
+            <button class="btn btn-publish" id="github-publish-btn" title="Replace live database with the GitHub version (super admin only)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+              Publish Live
+            </button>
+            <span class="gh-last-action" id="gh-last-action"></span>
+          </div>
+
+          <div class="github-log" id="github-log"></div>
         </div>
 
       </div>
@@ -648,7 +722,7 @@
   // ── Stats ──────────────────────────────────────────────────────
   async function loadStats() {
     try {
-      const data = await fetch(`${API_URL}/api/stats`, { credentials: 'same-origin' }).then(r => r.json());
+      const data = await api('/api/admin/stats');
       const set = (id, val) => {
         const el = document.getElementById(id);
         el.classList.remove('skeleton');
@@ -659,8 +733,8 @@
       set('stat-total', data.total_entries);
       set('stat-en', data.unique_english);
       set('stat-mrh', data.unique_mara);
-      set('stat-def', data.with_definition);
-      set('stat-ex', data.with_example);
+      set('stat-def', data.approved);
+      set('stat-ex', data.pending);
     } catch (_) { /* non-critical */ }
   }
 
@@ -1190,10 +1264,98 @@
     }
   });
 
+  // ── GitHub Sync Panel ─────────────────────────────────────────
+  async function loadGitHubStatus() {
+    const badge = document.getElementById('github-status-badge');
+    badge.textContent = 'Checking…';
+    badge.className = 'github-badge disconnected';
+    try {
+      const data = await api('/api/admin/github/status');
+      if (!data.configured) {
+        badge.textContent = 'Not configured';
+        badge.className = 'github-badge error';
+        document.getElementById('gh-repo').textContent = data.reason || 'Set GITHUB_TOKEN secret on the worker';
+        return;
+      }
+      badge.textContent = 'Connected';
+      badge.className = 'github-badge connected';
+      const repoUrl = `https://github.com/${escHtml(data.repo)}/tree/${escHtml(data.branch)}`;
+      document.getElementById('gh-repo').innerHTML =
+        `<a href="${repoUrl}" target="_blank" rel="noopener">${escHtml(data.repo)}</a> &nbsp;<span class="sha-chip">${escHtml(data.branch)}</span>`;
+      if (data.last_commit) {
+        document.getElementById('gh-commit').innerHTML =
+          `<a href="${escHtml(data.last_commit.url)}" target="_blank" rel="noopener"><span class="sha-chip">${escHtml(data.last_commit.short_sha)}</span></a>&nbsp; ${escHtml(data.last_commit.message)}`;
+        document.getElementById('gh-author').textContent =
+          `${data.last_commit.author} · ${new Date(data.last_commit.date).toLocaleString()}`;
+      } else {
+        document.getElementById('gh-commit').textContent = 'No commits yet';
+        document.getElementById('gh-author').textContent = '—';
+      }
+      document.getElementById('gh-db-count').textContent = (data.db_entries || 0).toLocaleString();
+    } catch (err) {
+      badge.textContent = 'Error';
+      badge.className = 'github-badge error';
+      document.getElementById('gh-repo').textContent = err.message;
+    }
+  }
+
+  function ghLog(msg, type = '') {
+    const log = document.getElementById('github-log');
+    log.classList.add('visible');
+    const p = document.createElement('p');
+    if (type === 'error')   p.style.color = 'var(--red)';
+    if (type === 'success') p.style.color = 'var(--green)';
+    p.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    log.insertBefore(p, log.firstChild);
+    document.getElementById('gh-last-action').textContent = `Last: ${new Date().toLocaleTimeString()}`;
+  }
+
+  document.getElementById('github-refresh-btn').addEventListener('click', () => loadGitHubStatus());
+
+  document.getElementById('github-sync-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('github-sync-btn');
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
+    try {
+      const result = await api('/api/admin/github/sync', { method: 'POST' });
+      ghLog(`Synced ${result.total_entries} entries → ${result.commit_sha ? result.commit_sha.slice(0,7) : 'unchanged'}`, 'success');
+      toast('Dictionary synced to GitHub.', 'success');
+      loadGitHubStatus();
+    } catch (err) {
+      ghLog(`Sync failed: ${err.message}`, 'error');
+      toast(`GitHub sync failed: ${err.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 17 21 12 16 7"/><path d="M21 12H9"/><path d="M9 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/></svg> Sync to GitHub';
+    }
+  });
+
+  document.getElementById('github-publish-btn').addEventListener('click', async () => {
+    if (!confirm('⚠️ PUBLISH LIVE will REPLACE all dictionary entries with the latest GitHub version.\n\nThis overwrites the live database. Are you sure?')) return;
+    const btn = document.getElementById('github-publish-btn');
+    btn.disabled = true;
+    btn.textContent = 'Publishing…';
+    try {
+      const result = await api('/api/admin/github/publish', { method: 'POST' });
+      ghLog(`Published ${result.published} entries from GitHub (replaced ${result.previous_count}).`, 'success');
+      toast(`Published ${result.published} entries from GitHub.`, 'success');
+      loadStats();
+      loadEntries();
+      loadGitHubStatus();
+    } catch (err) {
+      ghLog(`Publish failed: ${err.message}`, 'error');
+      toast(`Publish failed: ${err.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg> Publish Live';
+    }
+  });
+
   // ── Init ───────────────────────────────────────────────────────
   loadStats();
   loadEntries();
   loadSuggestions();
+  loadGitHubStatus();
   </script>
 </body>
 </html>

@@ -36,7 +36,7 @@
  */
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     const corsHeaders = {
@@ -60,7 +60,7 @@ export default {
     }
 
     if (url.pathname.startsWith('/api/admin/')) {
-      return await handleAdmin(request, url, env, adminCorsHeaders);
+      return await handleAdmin(request, url, env, ctx, adminCorsHeaders);
     }
 
     if (url.pathname === '/api/suggestions') {
@@ -155,81 +155,175 @@ async function insertAuditLog(db, { action, table_name, record_id, performed_by,
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GITHUB INTEGRATION
+// GITHUB INTEGRATION — Glottolog-style (GitHub ↔ D1 canonical sync)
+//
+// Flow: every write op → D1 updated immediately + ctx.waitUntil(syncToGitHub)
+//       "Publish Live" → fetch dictionary-data.json from GitHub → atomic D1 replace
+//
+// Secrets (set via: npx wrangler secret put <NAME>):
+//   GITHUB_TOKEN         — PAT with repo:write scope
+// Optional env vars (Cloudflare dashboard → Variables):
+//   GITHUB_OWNER         — default: MLP
+//   GITHUB_REPO          — default: mara-dictionary-archive
+//   GITHUB_BRANCH        — default: main
+//   GITHUB_SQL_PATH      — default: worker/seed_updated.sql
+//   GITHUB_JSON_PATH     — default: worker/dictionary-data.json
 // ═══════════════════════════════════════════════════════════════
 
-const GITHUB_OWNER = 'MLP';
-const GITHUB_REPO = 'mara-dictionary-archive';
+function ghConfig(env) {
+  return {
+    owner:    env.GITHUB_OWNER    || 'Laitei40',
+    repo:     env.GITHUB_REPO     || 'EngMaraDictionary',
+    branch:   env.GITHUB_BRANCH   || 'main',
+    sqlPath:  env.GITHUB_SQL_PATH  || 'worker/seed_updated.sql',
+    jsonPath: env.GITHUB_JSON_PATH || 'worker/dictionary-data.json',
+  };
+}
 
-async function commitWordToGitHub(env, word, email) {
-  const token = env.GITHUB_TOKEN;
-  if (!token) {
-    console.error('GITHUB_TOKEN not configured — skipping Git commit');
-    return { skipped: true, reason: 'GITHUB_TOKEN not set' };
-  }
-
-  const direction = 'en-mrh';
-  const safeWord = word.english_word.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-  const filePath = `dictionary/${direction}/${safeWord}.json`;
-
-  const content = JSON.stringify({
-    id: word.id,
-    english_word: word.english_word,
-    mara_word: word.mara_word,
-    part_of_speech: word.part_of_speech,
-    definition: word.definition,
-    example_sentence: word.example_sentence,
-    version: word.version,
-    status: word.status,
-    approved_by: word.approved_by,
-    approved_at: word.approved_at,
-    updated_by: word.updated_by,
-    updated_at: word.updated_at,
-  }, null, 2);
-
-  const base64Content = btoa(unescape(encodeURIComponent(content)));
-  const apiBase = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`;
-  const headers = {
+function ghHeaders(token) {
+  return {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
     'Content-Type': 'application/json',
-    'User-Agent': 'Mara-Dictionary-Worker',
+    'User-Agent': 'Mara-Dictionary-Worker/2.0',
     'X-GitHub-Api-Version': '2022-11-28',
   };
+}
 
-  let sha = null;
+// ── Export: D1 → SQL (human-readable, committed to sqlPath) ──
+async function exportDictionaryAsSQL(db) {
+  const { results } = await db.prepare(`
+    SELECT id, english_word, mara_word, part_of_speech, definition, example_sentence
+    FROM dictionary
+    WHERE status != 'archived'
+    ORDER BY english_word ASC
+  `).all();
+  const esc = v => v == null ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`;
+  const header = [
+    '-- ============================================================',
+    '-- English ⇄ Mara Dictionary — Seed Data (Auto-exported)',
+    `-- Generated: ${new Date().toISOString()}`,
+    `-- Total entries: ${results.length}`,
+    '-- ============================================================',
+    '',
+    'DELETE FROM dictionary;',
+    "DELETE FROM sqlite_sequence WHERE name='dictionary';",
+    '',
+  ].join('\n');
+  if (!results.length) return header + '-- (no entries)\n';
+  const rows = results.map(r =>
+    `  (${esc(r.english_word)}, ${esc(r.mara_word)}, ` +
+    `${esc(r.part_of_speech)}, ${esc(r.definition)}, ${esc(r.example_sentence)})`
+  ).join(',\n');
+  return header +
+    'INSERT INTO dictionary (english_word, mara_word, part_of_speech, definition, example_sentence) VALUES\n' +
+    rows + ';\n';
+}
+
+// ── Export: D1 → JSON (machine-readable, committed to jsonPath) ──
+async function exportDictionaryAsJSON(db) {
+  const { results } = await db.prepare(`
+    SELECT id, english_word, mara_word, part_of_speech, definition, example_sentence,
+           version, status, approved_by, approved_at, updated_by, updated_at, created_at
+    FROM dictionary
+    WHERE status != 'archived'
+    ORDER BY english_word ASC
+  `).all();
+  return JSON.stringify({
+    schema_version: '1.0',
+    generated_at: new Date().toISOString(),
+    total: results.length,
+    entries: results,
+  }, null, 2);
+}
+
+// ── Low-level GitHub API helpers ───────────────────────────────
+async function ghGetFileSha(token, owner, repo, path, branch) {
   try {
-    const getRes = await fetch(apiBase, { method: 'GET', headers });
-    if (getRes.ok) {
-      const existing = await getRes.json();
-      sha = existing.sha;
-    }
-  } catch { /* file doesn't exist yet */ }
+    const res = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`,
+      { headers: ghHeaders(token) }
+    );
+    if (res.ok) { const d = await res.json(); return d.sha || null; }
+  } catch {}
+  return null;
+}
 
-  const commitMessage = `Approve word: ${word.english_word} (${direction}) v${word.version}\nApproved by: ${email}`;
-
-  const body = {
-    message: commitMessage,
-    content: base64Content,
-    ...(sha ? { sha } : {}),
-  };
-
-  try {
-    const putRes = await fetch(apiBase, {
+async function ghCommitFile(token, owner, repo, path, branch, content, message, sha) {
+  const base64 = btoa(unescape(encodeURIComponent(content)));
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
+    {
       method: 'PUT',
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    if (!putRes.ok) {
-      const errBody = await putRes.text();
-      console.error('GitHub commit failed:', putRes.status, errBody);
-      return { success: false, status: putRes.status, error: errBody };
+      headers: ghHeaders(token),
+      body: JSON.stringify({ message, content: base64, branch, ...(sha ? { sha } : {}) }),
     }
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return { success: false, status: res.status, error: err };
+  }
+  const d = await res.json();
+  return { success: true, commit_sha: d.commit?.sha, file_sha: d.content?.sha };
+}
 
-    return { success: true };
+async function ghGetLastCommit(token, owner, repo, path, branch) {
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/commits?path=${encodeURIComponent(path)}&per_page=1&sha=${branch}`,
+      { headers: ghHeaders(token) }
+    );
+    if (!res.ok) return null;
+    const commits = await res.json();
+    if (!Array.isArray(commits) || !commits.length) return null;
+    const c = commits[0];
+    return {
+      sha:       c.sha,
+      short_sha: c.sha.slice(0, 7),
+      message:   c.commit.message.split('\n')[0],
+      author:    c.commit.author.name,
+      date:      c.commit.author.date,
+      url:       c.html_url,
+    };
+  } catch { return null; }
+}
+
+async function ghFetchFileContent(token, owner, repo, path, branch) {
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`,
+    { headers: ghHeaders(token) }
+  );
+  if (!res.ok) throw new Error(`GitHub fetch failed (${res.status}): ${path}`);
+  const d = await res.json();
+  return decodeURIComponent(escape(atob(d.content.replace(/\n/g, ''))));
+}
+
+// ── Main sync: D1 → GitHub (fired after every write via ctx.waitUntil) ──
+async function syncToGitHub(env, db, commitMessage) {
+  const cfg = ghConfig(env);
+  const token = env.GITHUB_TOKEN;
+  if (!token) return { skipped: true, reason: 'GITHUB_TOKEN not configured' };
+  try {
+    const [sqlContent, jsonContent] = await Promise.all([
+      exportDictionaryAsSQL(db),
+      exportDictionaryAsJSON(db),
+    ]);
+    const [sqlSha, jsonSha] = await Promise.all([
+      ghGetFileSha(token, cfg.owner, cfg.repo, cfg.sqlPath, cfg.branch),
+      ghGetFileSha(token, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch),
+    ]);
+    const [sqlResult, jsonResult] = await Promise.all([
+      ghCommitFile(token, cfg.owner, cfg.repo, cfg.sqlPath, cfg.branch, sqlContent, commitMessage, sqlSha),
+      ghCommitFile(token, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch, jsonContent, commitMessage, jsonSha),
+    ]);
+    return {
+      success: sqlResult.success && jsonResult.success,
+      commit_sha: sqlResult.commit_sha,
+      sql:  sqlResult,
+      json: jsonResult,
+    };
   } catch (err) {
-    console.error('GitHub commit error:', err.message);
+    console.error('syncToGitHub error:', err.message);
     return { success: false, error: err.message };
   }
 }
@@ -594,7 +688,7 @@ async function verifyTurnstile(token, secret, remoteip) {
 // ADMIN HANDLER
 // ═══════════════════════════════════════════════════════════════
 
-async function handleAdmin(request, url, env, corsHeaders) {
+async function handleAdmin(request, url, env, ctx, corsHeaders) {
   const db = env.DB;
   const method = request.method;
 
@@ -870,9 +964,9 @@ async function handleAdmin(request, url, env, corsHeaders) {
         performed_by: email, old_value: oldWord, new_value: newWord,
       });
 
-      const gitResult = await commitWordToGitHub(env, newWord, email);
+      ctx.waitUntil(syncToGitHub(env, db, `Approve revision: ${newWord.english_word} v${newWord.version} by ${email}`));
 
-      return jsonResponse({ success: true, entry: newWord, git: gitResult }, 200, corsHeaders);
+      return jsonResponse({ success: true, entry: newWord, github: 'syncing' }, 200, corsHeaders);
     } catch (err) {
       return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
     }
@@ -968,6 +1062,27 @@ async function handleAdmin(request, url, env, corsHeaders) {
       return jsonResponse({ results }, 200, corsHeaders);
     } catch (err) {
       return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
+  // GET /api/admin/stats — full stats including pending
+  if (url.pathname === '/api/admin/stats' && method === 'GET') {
+    try {
+      const row = await db.prepare(`
+        SELECT
+          COUNT(*) AS total_entries,
+          COUNT(DISTINCT english_word) AS unique_english,
+          COUNT(DISTINCT CASE WHEN mara_word != '' THEN mara_word END) AS unique_mara,
+          SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved,
+          SUM(CASE WHEN status = 'pending'  THEN 1 ELSE 0 END) AS pending,
+          SUM(CASE WHEN status = 'archived' THEN 1 ELSE 0 END) AS archived,
+          COUNT(CASE WHEN definition IS NOT NULL AND definition != '' THEN 1 END) AS with_definition,
+          COUNT(CASE WHEN example_sentence IS NOT NULL AND example_sentence != '' THEN 1 END) AS with_example
+        FROM dictionary
+      `).first();
+      return jsonResponse(row, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: err.message }, 500, corsHeaders);
     }
   }
 
@@ -1073,9 +1188,9 @@ async function handleAdmin(request, url, env, corsHeaders) {
         performed_by: email, old_value: null, new_value: created,
       });
 
-      const gitResult = await commitWordToGitHub(env, created, email);
+      ctx.waitUntil(syncToGitHub(env, db, `Create entry: ${english_word} by ${email}`));
 
-      return jsonResponse({ success: true, entry: created, git: gitResult }, 201, corsHeaders);
+      return jsonResponse({ success: true, entry: created, github: 'syncing' }, 201, corsHeaders);
     } catch (err) {
       return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
     }
@@ -1171,9 +1286,9 @@ async function handleAdmin(request, url, env, corsHeaders) {
         performed_by: email, old_value: existing, new_value: updated,
       });
 
-      const gitResult = await commitWordToGitHub(env, updated, email);
+      ctx.waitUntil(syncToGitHub(env, db, `Update entry: ${updated.english_word} v${updated.version} by ${email}`));
 
-      return jsonResponse({ success: true, entry: updated, git: gitResult }, 200, corsHeaders);
+      return jsonResponse({ success: true, entry: updated, github: 'syncing' }, 200, corsHeaders);
     } catch (err) {
       return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
     }
@@ -1212,6 +1327,8 @@ async function handleAdmin(request, url, env, corsHeaders) {
         new_value: { ...updated, archive_reason: reason },
       });
 
+      ctx.waitUntil(syncToGitHub(env, db, `Archive entry #${id} (${existing.english_word}) by ${email}`));
+
       return jsonResponse({ success: true, entry: updated }, 200, corsHeaders);
     } catch (err) {
       return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
@@ -1243,6 +1360,8 @@ async function handleAdmin(request, url, env, corsHeaders) {
         action: 'restore_entry', table_name: 'dictionary', record_id: id,
         performed_by: email, old_value: existing, new_value: updated,
       });
+
+      ctx.waitUntil(syncToGitHub(env, db, `Restore entry #${id} (${existing.english_word}) by ${email}`));
 
       return jsonResponse({ success: true, entry: updated }, 200, corsHeaders);
     } catch (err) {
@@ -1324,6 +1443,121 @@ async function handleAdmin(request, url, env, corsHeaders) {
       return jsonResponse({ success: true, deleted_id: id }, 200, corsHeaders);
     } catch (err) {
       return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // GITHUB SYNC — Glottolog editorial workflow
+  //   GET  /api/admin/github/status   — last commit + D1 count
+  //   POST /api/admin/github/sync     — D1 → GitHub full export
+  //   POST /api/admin/github/publish  — GitHub JSON → D1 (publish live)
+  // ═════════════════════════════════════════════════════════════
+
+  if (url.pathname === '/api/admin/github/status' && method === 'GET') {
+    if (!hasRole(role, 'senior_reviewer'))
+      return jsonResponse({ error: 'Senior reviewer role required' }, 403, corsHeaders);
+    const cfg = ghConfig(env);
+    if (!env.GITHUB_TOKEN)
+      return jsonResponse({ configured: false, reason: 'GITHUB_TOKEN not set on the worker' }, 200, corsHeaders);
+    try {
+      const [lastCommit, dbCount] = await Promise.all([
+        ghGetLastCommit(env.GITHUB_TOKEN, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch),
+        db.prepare("SELECT COUNT(*) AS total FROM dictionary WHERE status != 'archived'").first(),
+      ]);
+      return jsonResponse({
+        configured: true,
+        repo:        `${cfg.owner}/${cfg.repo}`,
+        branch:      cfg.branch,
+        sql_file:    cfg.sqlPath,
+        json_file:   cfg.jsonPath,
+        last_commit: lastCommit,
+        db_entries:  dbCount?.total || 0,
+      }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'GitHub status check failed', details: err.message }, 500, corsHeaders);
+    }
+  }
+
+  if (url.pathname === '/api/admin/github/sync' && method === 'POST') {
+    if (!hasRole(role, 'senior_reviewer'))
+      return jsonResponse({ error: 'Senior reviewer role required' }, 403, corsHeaders);
+    if (!env.GITHUB_TOKEN)
+      return jsonResponse({ error: 'GITHUB_TOKEN not configured on this worker' }, 503, corsHeaders);
+    try {
+      const countRow = await db.prepare("SELECT COUNT(*) AS total FROM dictionary WHERE status != 'archived'").first();
+      const total = countRow?.total || 0;
+      const message = `Manual sync: ${total} entries — by ${email}`;
+      const result = await syncToGitHub(env, db, message);
+      if (!result.success && !result.skipped)
+        return jsonResponse({ error: 'GitHub sync failed', details: result }, 500, corsHeaders);
+      await insertAuditLog(db, {
+        action: 'github_sync', table_name: 'dictionary', record_id: null,
+        performed_by: email, old_value: null,
+        new_value: { total_entries: total, commit_sha: result.commit_sha },
+      });
+      return jsonResponse({ success: true, total_entries: total, commit_sha: result.commit_sha, details: result }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'GitHub sync error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
+  if (url.pathname === '/api/admin/github/publish' && method === 'POST') {
+    if (!hasRole(role, 'super_admin'))
+      return jsonResponse({ error: 'Super admin role required to publish from GitHub' }, 403, corsHeaders);
+    if (!env.GITHUB_TOKEN)
+      return jsonResponse({ error: 'GITHUB_TOKEN not configured on this worker' }, 503, corsHeaders);
+    try {
+      const cfg = ghConfig(env);
+      const jsonContent = await ghFetchFileContent(env.GITHUB_TOKEN, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch);
+      const data = JSON.parse(jsonContent);
+      const entries = data.entries;
+      if (!Array.isArray(entries))
+        return jsonResponse({ error: 'Invalid dictionary-data.json: missing entries array' }, 422, corsHeaders);
+
+      // Snapshot for audit
+      const beforeCount = (await db.prepare('SELECT COUNT(*) AS c FROM dictionary').first())?.c || 0;
+
+      // Atomic batch: clear + re-insert entire dictionary from GitHub
+      const batch = [
+        db.prepare('DELETE FROM dictionary'),
+        db.prepare("DELETE FROM sqlite_sequence WHERE name='dictionary'"),
+      ];
+      const now = new Date().toISOString();
+      for (const e of entries) {
+        batch.push(
+          db.prepare(
+            `INSERT INTO dictionary
+               (id, english_word, mara_word, part_of_speech, definition, example_sentence,
+                status, version, approved_by, approved_at, updated_by, updated_at, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`
+          ).bind(
+            e.id,
+            e.english_word, e.mara_word, e.part_of_speech || null,
+            e.definition || null, e.example_sentence || null,
+            e.status || 'approved', e.version || 1,
+            e.approved_by || email, e.approved_at || now,
+            e.updated_by  || email, e.updated_at  || now,
+            e.created_at  || now
+          )
+        );
+      }
+      await db.batch(batch);
+
+      await insertAuditLog(db, {
+        action: 'github_publish', table_name: 'dictionary', record_id: null,
+        performed_by: email,
+        old_value: { count: beforeCount },
+        new_value: { count: entries.length, source: `${cfg.owner}/${cfg.repo}@${cfg.branch}:${cfg.jsonPath}` },
+      });
+
+      return jsonResponse({
+        success: true,
+        published: entries.length,
+        previous_count: beforeCount,
+        source: `${cfg.owner}/${cfg.repo}@${cfg.branch}:${cfg.jsonPath}`,
+      }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Publish failed', details: err.message }, 500, corsHeaders);
     }
   }
 
