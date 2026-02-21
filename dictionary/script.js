@@ -25,11 +25,11 @@ const Config = Object.freeze({
 
   DEBOUNCE_MS:        300,
   SUGGEST_DEBOUNCE:   150,
-  CACHE_TTL_MS:       7 * 24 * 60 * 60 * 1000,
+  CACHE_TTL_MS:       24 * 60 * 60 * 1000,
   MAX_RECENT:         20,
   MIN_QUERY_LENGTH:   1,
   DB_NAME:            'HaoleiCache',
-  DB_VERSION:         1,
+  DB_VERSION:         2,
   STORE_NAME:         'searches',
   RECENT_KEY:         'mara_dict_recent',
   COOKIE_ACCEPTED:    'mara_dict_cookie_ok',
@@ -46,8 +46,19 @@ const Cache = (() => {
       if (db) return resolve(db);
       const req = indexedDB.open(Config.DB_NAME, Config.DB_VERSION);
       req.onupgradeneeded = (e) => {
-        const store = e.target.result.createObjectStore(Config.STORE_NAME, { keyPath: 'cacheKey' });
-        store.createIndex('timestamp', 'timestamp', { unique: false });
+        const idb = e.target.result;
+        // v1: searches store — per-query cache
+        if (!idb.objectStoreNames.contains(Config.STORE_NAME)) {
+          const store = idb.createObjectStore(Config.STORE_NAME, { keyPath: 'cacheKey' });
+          store.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+        // v2: words store — delta-sync entry cache
+        if (!idb.objectStoreNames.contains('words')) {
+          const wStore = idb.createObjectStore('words', { keyPath: 'id' });
+          wStore.createIndex('english_word', 'english_word', { unique: false });
+          wStore.createIndex('mara_word', 'mara_word', { unique: false });
+          wStore.createIndex('updated_at', 'updated_at', { unique: false });
+        }
       };
       req.onsuccess = (e) => { db = e.target.result; resolve(db); };
       req.onerror = (e) => reject(e.target.error);
@@ -118,6 +129,58 @@ const Cache = (() => {
   }
 
   return { open, put, get, purgeExpired };
+})();
+
+
+// ─── Sync (Delta Sync) ──────────────────────────────────────────────────────
+const Sync = (() => {
+  const LAST_SYNC_KEY = 'haolei_last_sync';
+
+  // Write an array of word records into the IndexedDB words store.
+  async function _storeWords(records) {
+    try {
+      const idb = await Cache.open();
+      const tx = idb.transaction('words', 'readwrite');
+      const store = tx.objectStore('words');
+      records.forEach(rec => store.put(rec));
+      await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    } catch { /* silent — sync is best-effort */ }
+  }
+
+  // Fetch one page of updates from the server and store them.
+  async function _fetchPage(since, offset) {
+    if (!Network.isOnline()) return;
+    try {
+      const url = `${Config.API_BASE}/api/updates?since=${encodeURIComponent(since)}&limit=200&offset=${offset}`;
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(10000),
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.results?.length) await _storeWords(data.results);
+      // Paginate if server has more records
+      if (data.hasMore) setTimeout(() => _fetchPage(since, offset + 200), 2000);
+    } catch { /* silent */ }
+  }
+
+  // Run a full delta sync in the background.
+  async function run() {
+    if (!Network.isOnline()) return;
+    const since = localStorage.getItem(LAST_SYNC_KEY) || '1970-01-01T00:00:00.000Z';
+    // Stamp before fetching so concurrent tabs don’t duplicate work.
+    localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
+    await _fetchPage(since, 0);
+  }
+
+  // Schedule a background sync 3s after page load (non-blocking).
+  function init() {
+    if (typeof AbortSignal?.timeout === 'function') {
+      setTimeout(run, 3000);
+    }
+  }
+
+  return { init, run };
 })();
 
 
@@ -1388,6 +1451,7 @@ const App = (() => {
     MobileMenu.init();
     UI.init();
     CookieConsent.init();
+    Sync.init();
   }
 
   return { init };

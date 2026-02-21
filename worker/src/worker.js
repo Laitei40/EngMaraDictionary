@@ -30,7 +30,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // CORS headers for all responses
+    // CORS headers for public routes
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS',
@@ -38,14 +38,23 @@ export default {
       'Access-Control-Max-Age': '86400',
     };
 
+    // CORS headers for admin routes — restricted to dashboard origin
+    const adminCorsHeaders = {
+      'Access-Control-Allow-Origin': 'https://admindic.marareih.org',
+      'Access-Control-Allow-Methods': 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    };
+
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders });
+      const h = url.pathname.startsWith('/api/admin/') ? adminCorsHeaders : corsHeaders;
+      return new Response(null, { status: 204, headers: h });
     }
 
     // Admin CRUD routes — skip the GET-only guard for /api/admin/*
     if (url.pathname.startsWith('/api/admin/')) {
-      return await handleAdmin(request, url, env, corsHeaders);
+      return await handleAdmin(request, url, env, adminCorsHeaders);
     }
 
     // Public suggestion submit route
@@ -93,6 +102,10 @@ export default {
         }, 200, { ...corsHeaders, 'Cache-Control': 'public, max-age=300' });
       }
 
+      if (url.pathname === '/api/updates') {
+        return await handleUpdates(url, env.DB, corsHeaders);
+      }
+
       // Serve a simple test page at root
       if (url.pathname === '/' || url.pathname === '') {
         return new Response(`
@@ -121,119 +134,87 @@ export default {
 };
 
 /**
- * Handle dictionary search requests.
- * GET /api/search?q=<query>&lang=en|mrh
+ * Handle dictionary search requests — FTS5 for high-performance full-text search.
+ * GET /api/search?q=<query>&lang=en|mrh&limit=30&offset=0
  */
 async function handleSearch(url, db, corsHeaders) {
-  const query = (url.searchParams.get('q') || '').trim();
-  const lang  = (url.searchParams.get('lang') || 'en').toLowerCase();
+  const query  = (url.searchParams.get('q') || '').trim();
+  const lang   = (url.searchParams.get('lang') || 'en').toLowerCase();
+  const limit  = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '30', 10)));
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10));
 
-  // Validate
-  if (!query) {
-    return jsonResponse({ error: 'Missing search query. Use ?q=word' }, 400, corsHeaders);
-  }
-
-  if (query.length > 100) {
-    return jsonResponse({ error: 'Query too long (max 100 characters)' }, 400, corsHeaders);
-  }
-
-  if (lang !== 'en' && lang !== 'mrh') {
+  if (!query)             return jsonResponse({ error: 'Missing search query. Use ?q=word' }, 400, corsHeaders);
+  if (query.length > 100) return jsonResponse({ error: 'Query too long (max 100 characters)' }, 400, corsHeaders);
+  if (lang !== 'en' && lang !== 'mrh')
     return jsonResponse({ error: 'Invalid lang parameter. Use "en" or "mrh".' }, 400, corsHeaders);
-  }
 
-  const searchColumn = lang === 'en' ? 'english_word' : 'mara_word';
-  const lowerQuery = query.toLowerCase();
+  const ftsCol   = lang === 'en' ? 'english_word' : 'mara_word';
+  const orderCol = lang === 'en' ? 'english_word' : 'mara_word';
 
-  // Search strategy:
-  // 1. Exact match (case-insensitive)
-  // 2. Prefix match
-  // 3. Contains match
-  // Results are ordered: exact → prefix → contains
-  const sql = `
-    SELECT
-      id,
-      english_word,
-      mara_word,
-      part_of_speech,
-      definition,
-      example_sentence
-    FROM dictionary
-    WHERE LOWER(${searchColumn}) = ?1
-       OR LOWER(${searchColumn}) LIKE ?2
-       OR LOWER(${searchColumn}) LIKE ?3
-    ORDER BY
-      CASE
-        WHEN LOWER(${searchColumn}) = ?1 THEN 0
-        WHEN LOWER(${searchColumn}) LIKE ?2 THEN 1
-        ELSE 2
-      END,
-      ${searchColumn} ASC
-    LIMIT 50
-  `;
-
-  const prefixPattern   = `${lowerQuery}%`;
-  const containsPattern = `%${lowerQuery}%`;
+  // Build FTS5 column-specific prefix query — strip special syntax chars, then col:term* per word
+  const terms = query.replace(/["^*()[\]{}:!]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (!terms.length) return jsonResponse({ query, lang, count: 0, results: [] }, 200, corsHeaders);
+  const ftsQuery = terms.map(t => `${ftsCol}:${t}*`).join(' ');
 
   try {
-    const { results } = await db.prepare(sql)
-      .bind(lowerQuery, prefixPattern, containsPattern)
-      .all();
+    const { results } = await db.prepare(`
+      SELECT d.id, d.english_word, d.mara_word, d.part_of_speech, d.definition, d.example_sentence
+      FROM dictionary d
+      WHERE d.id IN (SELECT rowid FROM dictionary_fts WHERE dictionary_fts MATCH ?1)
+      ORDER BY d.${orderCol} ASC
+      LIMIT ?2 OFFSET ?3
+    `).bind(ftsQuery, limit, offset).all();
 
     return jsonResponse(
       { query, lang, count: results.length, results },
       200,
-      {
-        ...corsHeaders,
-        'Cache-Control': 'public, max-age=300', // 5-minute edge cache
-      }
+      { ...corsHeaders, 'Cache-Control': 'public, max-age=300' }
     );
-  } catch (dbErr) {
-    console.error('Database error:', dbErr);
-    return jsonResponse(
-      { error: 'Database error', details: dbErr.message },
-      500,
-      corsHeaders
-    );
+  } catch (ftsErr) {
+    console.error('FTS search error — falling back to LIKE:', ftsErr.message);
+    const col     = lang === 'en' ? 'english_word' : 'mara_word';
+    const pattern = `${query}%`;
+    try {
+      const { results } = await db.prepare(`
+        SELECT id, english_word, mara_word, part_of_speech, definition, example_sentence
+        FROM dictionary
+        WHERE ${col} LIKE ?1 COLLATE NOCASE
+        ORDER BY ${col} ASC
+        LIMIT ?2 OFFSET ?3
+      `).bind(pattern, limit, offset).all();
+      return jsonResponse({ query, lang, count: results.length, results }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
   }
 }
 
 /**
- * Autocomplete suggestions — returns up to 8 word matches for prefix.
+ * Autocomplete suggestions — prefix search using COLLATE NOCASE index.
  * GET /api/suggest?q=<prefix>&lang=en|mrh
  */
 async function handleSuggest(url, db, corsHeaders) {
   const query = (url.searchParams.get('q') || '').trim();
   const lang  = (url.searchParams.get('lang') || 'en').toLowerCase();
 
-  if (!query || query.length < 1) {
-    return jsonResponse({ suggestions: [] }, 200, corsHeaders);
-  }
-
-  if (lang !== 'en' && lang !== 'mrh') {
-    return jsonResponse({ suggestions: [] }, 200, corsHeaders);
-  }
+  if (!query) return jsonResponse({ suggestions: [] }, 200, corsHeaders);
+  if (lang !== 'en' && lang !== 'mrh') return jsonResponse({ suggestions: [] }, 200, corsHeaders);
 
   const col = lang === 'en' ? 'english_word' : 'mara_word';
-  const lowerQ = query.toLowerCase();
 
   try {
     const { results } = await db.prepare(`
       SELECT DISTINCT ${col} AS word
       FROM dictionary
-      WHERE LOWER(${col}) LIKE ?1
-      ORDER BY
-        CASE WHEN LOWER(${col}) = ?2 THEN 0
-             WHEN LOWER(${col}) LIKE ?3 THEN 1
-             ELSE 2
-        END,
-        LENGTH(${col}) ASC
+      WHERE ${col} LIKE ?1 COLLATE NOCASE
+      ORDER BY LENGTH(${col}) ASC, ${col} ASC
       LIMIT 8
-    `).bind(`${lowerQ}%`, lowerQ, `${lowerQ}%`).all();
+    `).bind(`${query}%`).all();
 
     return jsonResponse(
       { suggestions: results.map(r => r.word) },
       200,
-      { ...corsHeaders, 'Cache-Control': 'public, max-age=600' }
+      { ...corsHeaders, 'Cache-Control': 'public, max-age=60' }
     );
   } catch (err) {
     return jsonResponse({ suggestions: [], error: err.message }, 200, corsHeaders);
@@ -499,6 +480,12 @@ async function handleSuggestionSubmit(request, env, corsHeaders) {
     }, 400, corsHeaders);
   }
 
+  // Rate limit: max 5 suggestions per IP per hour
+  const allowed = await checkRateLimit(db, clientIp || null);
+  if (!allowed) {
+    return jsonResponse({ error: 'Rate limit exceeded. Please try again later.' }, 429, corsHeaders);
+  }
+
   try {
     const result = await db.prepare(`
       INSERT INTO suggestions (
@@ -525,6 +512,70 @@ async function handleSuggestionSubmit(request, env, corsHeaders) {
     }, 201, corsHeaders);
   } catch (err) {
     return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+  }
+}
+
+/**
+ * Delta sync — return only rows updated since a given timestamp.
+ * GET /api/updates?since=<ISO8601>&limit=200&offset=0
+ */
+async function handleUpdates(url, db, corsHeaders) {
+  const since  = (url.searchParams.get('since') || '').trim();
+  const limit  = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '200', 10)));
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10));
+
+  if (!since) {
+    return jsonResponse({ error: 'Missing required parameter: since (ISO 8601 timestamp)' }, 400, corsHeaders);
+  }
+
+  try {
+    const { results } = await db.prepare(`
+      SELECT id, english_word, mara_word, part_of_speech, definition, example_sentence, updated_at
+      FROM dictionary
+      WHERE updated_at > ?1
+      ORDER BY updated_at ASC
+      LIMIT ?2 OFFSET ?3
+    `).bind(since, limit, offset).all();
+
+    return jsonResponse(
+      { since, count: results.length, results, hasMore: results.length === limit },
+      200,
+      { ...corsHeaders, 'Cache-Control': 'no-store' }
+    );
+  } catch (err) {
+    return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+  }
+}
+
+/**
+ * Rate limiting helper — max 5 suggestions per IP per hour.
+ * Uses the suggestion_rate_limits table (created in migration 003).
+ */
+async function checkRateLimit(db, ip) {
+  if (!ip) return true;
+  const maxPerHour = 5;
+  try {
+    const windowStart = new Date(Date.now() - 3600_000).toISOString().slice(0, 19).replace('T', ' ');
+    const record = await db.prepare(
+      'SELECT count, window_start FROM suggestion_rate_limits WHERE ip_hash = ?1'
+    ).bind(ip).first();
+
+    if (!record || record.window_start < windowStart) {
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      await db.prepare(
+        'INSERT OR REPLACE INTO suggestion_rate_limits (ip_hash, count, window_start) VALUES (?1, 1, ?2)'
+      ).bind(ip, now).run();
+      return true;
+    }
+
+    if (record.count >= maxPerHour) return false;
+
+    await db.prepare(
+      'UPDATE suggestion_rate_limits SET count = count + 1 WHERE ip_hash = ?1'
+    ).bind(ip).run();
+    return true;
+  } catch {
+    return true; // allow on DB error — don't block legitimate users
   }
 }
 
@@ -649,13 +700,12 @@ async function handleAdmin(request, url, env, corsHeaders) {
       let bindings = [];
 
       if (q) {
-        const pattern = `%${q.toLowerCase()}%`;
-        if (lang === 'mrh') {
-          whereClause = 'WHERE LOWER(mara_word) LIKE ?1';
-          bindings = [pattern];
-        } else {
-          whereClause = 'WHERE LOWER(english_word) LIKE ?1 OR LOWER(mara_word) LIKE ?1';
-          bindings = [pattern];
+        const terms = q.replace(/["^*()[\]{}:!]/g, ' ').trim().split(/\s+/).filter(Boolean);
+        if (terms.length) {
+          const ftsCol = lang === 'mrh' ? 'mara_word' : 'english_word';
+          const ftsQuery = terms.map(t => `${ftsCol}:${t}*`).join(' ');
+          whereClause = 'WHERE id IN (SELECT rowid FROM dictionary_fts WHERE dictionary_fts MATCH ?1)';
+          bindings = [ftsQuery];
         }
       }
 
@@ -671,7 +721,7 @@ async function handleAdmin(request, url, env, corsHeaders) {
         `SELECT id, english_word, mara_word, part_of_speech, definition, example_sentence, created_at
          FROM dictionary
          ${whereClause}
-         ORDER BY id DESC
+         ORDER BY english_word ASC
          LIMIT ?${limitIndex} OFFSET ?${limitIndex + 1}`
       ).bind(...paginationBindings).all();
 
@@ -771,7 +821,7 @@ async function handleAdmin(request, url, env, corsHeaders) {
 
       await db.prepare(
         `UPDATE dictionary SET english_word = ?1, mara_word = ?2, part_of_speech = ?3,
-             definition = ?4, example_sentence = ?5 WHERE id = ?6`
+             definition = ?4, example_sentence = ?5, updated_at = datetime('now') WHERE id = ?6`
       ).bind(
         english_word.trim(), mara_word.trim(), part_of_speech, definition, example_sentence, id,
       ).run();
