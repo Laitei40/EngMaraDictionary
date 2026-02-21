@@ -6,8 +6,8 @@
   <meta name="description" content="Haolei Privacy Policy — how we handle your data, cookies, and local storage.">
   <meta name="theme-color" content="#2563eb">
   <title>Privacy Policy — Haolei</title>
-  <link rel="icon" href="/favicon.ico" sizes="32x32 16x16">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" href="/favicon_light.ico" id="favicon-ico" sizes="32x32 16x16">
+  <link rel="icon" type="image/svg+xml" href="/favicon_light.svg" id="favicon-svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,9 +15,12 @@
   <script>
     (function(){
       var t = localStorage.getItem('mara_dict_theme');
-      if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.setAttribute('data-theme', 'dark');
-      }
+      var dark = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (dark) { document.documentElement.setAttribute('data-theme', 'dark'); }
+      var fIco = document.getElementById('favicon-ico');
+      var fSvg = document.getElementById('favicon-svg');
+      if (fIco) fIco.href = dark ? '/favicon_dark.ico' : '/favicon_light.ico';
+      if (fSvg) fSvg.href = dark ? '/favicon_dark.svg' : '/favicon_light.svg';
     })();
   </script>
 </head>
@@ -252,6 +255,10 @@
           const next = isDark ? 'light' : 'dark';
           document.documentElement.setAttribute('data-theme', next);
           localStorage.setItem(STORAGE_KEY, next);
+          const fIco = document.getElementById('favicon-ico');
+          const fSvg = document.getElementById('favicon-svg');
+          if (fIco) fIco.href = `/favicon_${next === 'dark' ? 'dark' : 'light'}.ico`;
+          if (fSvg) fSvg.href = `/favicon_${next === 'dark' ? 'dark' : 'light'}.svg`;
         });
       }
       const menuBtn = document.getElementById('mobile-menu-btn');

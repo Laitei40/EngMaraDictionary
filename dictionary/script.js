@@ -304,6 +304,11 @@ const ThemeToggle = (() => {
     // Update theme-color meta tag
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = theme === 'dark' ? '#0f172a' : '#2563eb';
+    // Swap favicons
+    const fIco = document.getElementById('favicon-ico');
+    const fSvg = document.getElementById('favicon-svg');
+    if (fIco) fIco.href = `/favicon_${theme === 'dark' ? 'dark' : 'light'}.ico`;
+    if (fSvg) fSvg.href = `/favicon_${theme === 'dark' ? 'dark' : 'light'}.svg`;
   }
 
   function toggle() {
