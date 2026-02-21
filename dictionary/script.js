@@ -722,16 +722,13 @@ const UI = (() => {
   }
 
   /**
-   * Render search results — groups entries by source word so multiple POS
-   * for the same word appear together (like MyOrdbok).
+   * Render search results — groups entries by source word, deduplicates,
+   * and displays each POS as a separate visual section within the card.
    */
   function _renderResults(results, lang, fromCache) {
     if (!results.length) return;
 
     const isEnToMara = lang === 'en';
-    const countText = results.length === 1 ? '1 result' : `${results.length} results`;
-    $resultsCount.textContent = countText;
-    $resultsCount.classList.remove('hidden');
 
     // Group by source word
     const groups = new Map();
@@ -742,39 +739,87 @@ const UI = (() => {
       groups.get(key).entries.push(entry);
     });
 
+    const groupCount = groups.size;
+    const countText = groupCount === 1 ? '1 result' : `${groupCount} results`;
+    $resultsCount.textContent = countText;
+    $resultsCount.classList.remove('hidden');
+
     let html = '';
+    let cardIndex = 0;
     for (const [, group] of groups) {
       const shareUrl = _shareURL(group.word, lang);
-      html += `<div class="dict-entry dict-entry-clickable">`;
+
+      // Deduplicate entries within the group by (translation + POS + definition)
+      const seen = new Set();
+      const uniqueEntries = group.entries.filter((entry) => {
+        const target = isEnToMara ? entry.mara_word : entry.english_word;
+        const sig = `${(target || '').toLowerCase()}|${(entry.part_of_speech || '').toLowerCase()}|${(entry.definition || '').toLowerCase()}`;
+        if (seen.has(sig)) return false;
+        seen.add(sig);
+        return true;
+      });
+
+      // Sub-group by POS for a cleaner layout
+      const posSections = new Map();
+      uniqueEntries.forEach((entry) => {
+        const pos = entry.part_of_speech || '';
+        if (!posSections.has(pos)) posSections.set(pos, []);
+        posSections.get(pos).push(entry);
+      });
+
+      html += `<article class="dict-entry dict-entry-clickable" style="animation-delay:${cardIndex * 40}ms">`;
+
+      // Card header
       html += `<div class="dict-entry-header">`;
-      html += `  <button class="dict-word dict-word-link" data-word="${_escapeHtml(group.word)}">${_escapeHtml(group.word)}</button>`;
+      html += `  <div class="dict-header-left">`;
+      html += `    <button class="dict-word dict-word-link" data-word="${_escapeHtml(group.word)}">${_escapeHtml(group.word)}</button>`;
+      // Collect unique POS badges for the header
+      const posLabels = [...new Set(uniqueEntries.map(e => e.part_of_speech).filter(Boolean))];
+      if (posLabels.length) {
+        html += `<div class="dict-pos-badges">`;
+        posLabels.forEach(pos => {
+          html += `<span class="dict-pos-badge">${_escapeHtml(pos)}</span>`;
+        });
+        html += `</div>`;
+      }
+      html += `  </div>`;
       html += `  <button class="share-btn" data-url="${_escapeHtml(shareUrl)}" title="Copy link to this word" aria-label="Share">`;
-      html += `    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+      html += `    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
       html += `  </button>`;
       html += `</div>`;
 
-      group.entries.forEach((entry) => {
-        const targetWord  = isEnToMara ? entry.mara_word : entry.english_word;
+      // Translation body — show each POS section
+      let sectionIdx = 0;
+      for (const [pos, entries] of posSections) {
+        html += `<div class="dict-sense${sectionIdx > 0 ? ' dict-sense-divider' : ''}">`;
+
+        // Collect unique translations for this POS
+        const translations = [...new Set(entries.map(e => isEnToMara ? e.mara_word : e.english_word).filter(Boolean))];
         const targetLabel = isEnToMara ? 'Mara' : 'English';
 
-        if (entry.part_of_speech) {
-          html += `<span class="dict-pos">${_escapeHtml(entry.part_of_speech)}</span>`;
-        }
-
-        html += `<div class="dict-translation-block">`;
-        html += `  <div class="dict-translation-label">${targetLabel}</div>`;
-        html += `  <div class="dict-translation">${_escapeHtml(targetWord)}</div>`;
+        html += `<div class="dict-sense-translations">`;
+        html += `  <span class="dict-sense-label">${_escapeHtml(targetLabel)}</span>`;
+        html += `  <span class="dict-sense-value">${translations.map(t => _escapeHtml(t)).join(', ')}</span>`;
         html += `</div>`;
 
-        if (entry.definition) {
-          html += `<div class="dict-definition">${_escapeHtml(entry.definition)}</div>`;
+        // Show first definition found
+        const def = entries.find(e => e.definition);
+        if (def) {
+          html += `<p class="dict-sense-def">${_escapeHtml(def.definition)}</p>`;
         }
-        if (entry.example_sentence) {
-          html += `<div class="dict-example">\u201c${_escapeHtml(entry.example_sentence)}\u201d</div>`;
-        }
-      });
 
-      html += `</div>`;
+        // Show first example found
+        const ex = entries.find(e => e.example_sentence);
+        if (ex) {
+          html += `<div class="dict-sense-example">\u201c${_escapeHtml(ex.example_sentence)}\u201d</div>`;
+        }
+
+        html += `</div>`;
+        sectionIdx++;
+      }
+
+      html += `</article>`;
+      cardIndex++;
     }
 
     $resultsContainer.innerHTML = html;
