@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Developer Dashboard — MaraDict</title>
+  <title>Developer Dashboard — Haolei</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -253,7 +253,7 @@
             <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
           </svg>
         </div>
-        <span>MaraDict</span>
+        <span>Haolei</span>
         <span class="topnav-badge">Dev</span>
       </div>
       <div id="api-chip" class="api-chip unset" title="Set API URL">
@@ -544,12 +544,12 @@
 
   <script>
   /* ================================================================
-     MaraDict Developer Dashboard — CRUD Client
+     Haolei Developer Dashboard — CRUD Client
   ================================================================ */
 
   // ── Config ─────────────────────────────────────────────────────
   const STORE_API_URL = 'mara_api_url';
-  const DEFAULT_API_URL = 'https://engmaradictionary.teiteipara.workers.dev';
+  const DEFAULT_API_URL = 'https://EngMaraDictionary.teiteipara.workers.dev';
   let API_URL = (localStorage.getItem(STORE_API_URL) || DEFAULT_API_URL).replace(/\/$/, '');
 
   function applyApiUrl(url) {

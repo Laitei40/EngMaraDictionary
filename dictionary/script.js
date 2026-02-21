@@ -1,4 +1,4 @@
-/**
+﻿/**
  * English ⇄ Mara Dictionary — Frontend Application
  *
  * Features:
@@ -21,14 +21,14 @@
 
 // ─── Config ──────────────────────────────────────────────────────────
 const Config = Object.freeze({
-  API_BASE: 'https://engmaradictionary.teiteipara.workers.dev',
+  API_BASE: 'https://EngMaraDictionary.teiteipara.workers.dev',
 
   DEBOUNCE_MS:        300,
   SUGGEST_DEBOUNCE:   150,
   CACHE_TTL_MS:       7 * 24 * 60 * 60 * 1000,
   MAX_RECENT:         20,
   MIN_QUERY_LENGTH:   1,
-  DB_NAME:            'MaraDictCache',
+  DB_NAME:            'HaoleiCache',
   DB_VERSION:         1,
   STORE_NAME:         'searches',
   RECENT_KEY:         'mara_dict_recent',
@@ -1083,7 +1083,7 @@ const UI = (() => {
     _pushState(query, _currentLang);
 
     // Update page title
-    document.title = `${query} \u2014 MaraDict`;
+    document.title = `${query} \u2014 Haolei`;
 
     try {
       if (exactLookup) {
