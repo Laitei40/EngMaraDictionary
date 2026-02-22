@@ -1560,21 +1560,34 @@ async function handleAdmin(request, url, env, ctx, corsHeaders) {
     if (!env.GITHUB_TOKEN)
       return jsonResponse({ error: 'GITHUB_TOKEN not configured on this worker' }, 503, corsHeaders);
     try {
-      console.log('[sync] starting for', email);
+      // Query entry count synchronously (fast D1 read)
       const countRow = await db.prepare("SELECT COUNT(*) AS total FROM dictionary WHERE status != 'archived'").first();
       const total = countRow?.total || 0;
-      console.log('[sync] entry count:', total);
-      const message = `Manual sync: ${total} entries — by ${email}`;
-      const result = await syncToGitHub(env, db, message);
-      console.log('[sync] syncToGitHub result:', JSON.stringify(result));
-      if (!result.success && !result.skipped)
-        return jsonResponse({ error: 'GitHub sync failed', details: result }, 500, corsHeaders);
-      await insertAuditLog(db, {
-        action: 'github_sync', table_name: 'dictionary', record_id: null,
-        performed_by: email, old_value: null,
-        new_value: { total_entries: total, commit_sha: result.commit_sha },
-      });
-      return jsonResponse({ success: true, total_entries: total, commit_sha: result.commit_sha, details: result }, 200, corsHeaders);
+      const commitMsg = `Manual sync: ${total} entries — by ${email}`;
+      const syncedBy = email;
+
+      // Fire GitHub push in background — avoids 30s wall-clock timeout from outbound HTTP calls
+      ctx.waitUntil((async () => {
+        try {
+          console.log('[sync:bg] starting for', syncedBy, '—', total, 'entries');
+          const result = await syncToGitHub(env, db, commitMsg);
+          console.log('[sync:bg] result:', JSON.stringify(result));
+          await insertAuditLog(db, {
+            action: 'github_sync', table_name: 'dictionary', record_id: null,
+            performed_by: syncedBy, old_value: null,
+            new_value: { total_entries: total, commit_sha: result.commit_sha, success: result.success },
+          });
+        } catch (err) {
+          console.error('[sync:bg] error:', err.message);
+        }
+      })());
+
+      return jsonResponse({
+        success: true,
+        queued: true,
+        total_entries: total,
+        message: `Sync started for ${total} entries. Check GitHub in a few seconds.`,
+      }, 200, corsHeaders);
     } catch (err) {
       return jsonResponse({ error: 'GitHub sync error', details: err.message }, 500, corsHeaders);
     }

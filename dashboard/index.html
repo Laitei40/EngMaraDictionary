@@ -1318,9 +1318,16 @@
     btn.textContent = 'Syncing…';
     try {
       const result = await api('/api/admin/github/sync', { method: 'POST' });
-      ghLog(`Synced ${result.total_entries} entries → ${result.commit_sha ? result.commit_sha.slice(0,7) : 'unchanged'}`, 'success');
-      toast('Dictionary synced to GitHub.', 'success');
-      loadGitHubStatus();
+      if (result.queued) {
+        ghLog(`Sync queued for ${result.total_entries} entries — pushing to GitHub in background…`, 'success');
+        toast('Sync started. GitHub will update in a few seconds.', 'success');
+        // Auto-refresh status after GitHub has time to process
+        setTimeout(() => loadGitHubStatus(), 8000);
+      } else {
+        ghLog(`Synced ${result.total_entries} entries → ${result.commit_sha ? result.commit_sha.slice(0,7) : 'unchanged'}`, 'success');
+        toast('Dictionary synced to GitHub.', 'success');
+        loadGitHubStatus();
+      }
     } catch (err) {
       ghLog(`Sync failed: ${err.message}`, 'error');
       toast(`GitHub sync failed: ${err.message}`, 'error');
