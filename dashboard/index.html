@@ -373,11 +373,12 @@
                   <th>POS</th>
                   <th>Definition</th>
                   <th>Example</th>
-                  <th style="width:90px">Actions</th>
+                  <th style="width:80px">Status</th>
+                  <th style="width:110px">Actions</th>
                 </tr>
               </thead>
               <tbody id="entries-tbody">
-                <tr><td colspan="7">
+                <tr><td colspan="8">
                   <div class="table-empty">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                     <p>Loading entries…</p>
@@ -760,7 +761,7 @@
   // ── Entries table ──────────────────────────────────────────────
   async function loadEntries() {
     const tbody = document.getElementById('entries-tbody');
-    tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty">
+    tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty">
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       <p>Loading…</p></div></td></tr>`;
 
@@ -778,7 +779,7 @@
       renderTable(data.results || []);
       renderPagination();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty">
+      tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <p>Error: ${escHtml(err.message)}</p></div></td></tr>`;
     }
@@ -807,7 +808,7 @@
   function renderTable(rows) {
     const tbody = document.getElementById('entries-tbody');
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty">
+      tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <p>No entries found.</p></div></td></tr>`;
       return;
@@ -820,8 +821,14 @@
         <td class="td-pos">${r.part_of_speech ? `<span class="pos-badge">${escHtml(r.part_of_speech)}</span>` : '<span style="color:var(--text-3)">—</span>'}</td>
         <td class="td-def" title="${escHtml(r.definition || '')}">${r.definition ? escHtml(r.definition) : '<span style="color:var(--text-3)">—</span>'}</td>
         <td class="td-def" title="${escHtml(r.example_sentence || '')}">${r.example_sentence ? escHtml(r.example_sentence) : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td><span class="status-badge ${escHtml(r.status||'pending')}">${escHtml(r.status||'pending')}</span></td>
         <td>
           <div class="td-actions">
+            ${r.status !== 'approved' ? `
+            <button class="btn-icon approve" title="Publish" data-action="publish" data-id="${r.id}"
+              data-label="${escHtml(r.english_word)}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>` : ''}
             <button class="btn-icon edit" title="Edit" data-action="edit" data-id="${r.id}"
               data-en="${escHtml(r.english_word)}" data-mrh="${escHtml(r.mara_word)}"
               data-pos="${escHtml(r.part_of_speech||'')}" data-def="${escHtml(r.definition||'')}"
@@ -892,7 +899,21 @@
     if (!btn) return;
     if (btn.dataset.action === 'edit') openEditModal(btn.dataset);
     if (btn.dataset.action === 'delete') openConfirmModal(btn.dataset.id, btn.dataset.label);
+    if (btn.dataset.action === 'publish') publishEntry(btn, btn.dataset.id, btn.dataset.label);
   });
+
+  async function publishEntry(btn, id, label) {
+    if (!confirm(`Publish "${label}"? This will make it visible in the public dictionary.`)) return;
+    btn.disabled = true;
+    try {
+      await api(`/api/admin/entries/${id}/approve`, { method: 'POST' });
+      loadEntries();
+      loadStats();
+    } catch (err) {
+      alert(`Failed to publish: ${err.message}`);
+      btn.disabled = false;
+    }
+  }
 
   // ── Pagination ─────────────────────────────────────────────────
   function renderPagination() {
