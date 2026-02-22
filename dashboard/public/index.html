@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Developer Dashboard — Haolei</title>
+  <title>Dev Dashboard · EngMara Dictionary</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><path d='M7 5h6a5 5 0 0 1 5 5v16a3.5 3.5 0 0 0-3.5-3.5H7z' fill='white' opacity='.95'/><path d='M25 5h-6a5 5 0 0 0-5 5v16a3.5 3.5 0 0 1 3.5-3.5H25z' fill='white' opacity='.75'/></svg>">
   <script>
     (function(){
       var t = localStorage.getItem('mara_dict_theme');
@@ -70,7 +71,7 @@
     }
     .topnav-inner { max-width:1280px; margin:0 auto; padding:0 1.5rem; display:flex; align-items:center; justify-content:space-between; height:56px; }
     .topnav-brand { display:flex; align-items:center; gap:.625rem; font-weight:700; font-size:1.05rem; color:var(--text); text-decoration:none; user-select:none; }
-    .topnav-logo { width:32px; height:32px; background:var(--accent); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; }
+    .topnav-logo { width:32px; height:32px; background:linear-gradient(135deg,#1d4ed8,#3b82f6); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; box-shadow:0 1px 4px rgba(37,99,235,.35); }
     .topnav-badge { background:var(--orange-bg); color:var(--orange); border:1px solid var(--orange); font-size:.65rem; font-weight:700; padding:.1rem .45rem; border-radius:var(--radius-full); letter-spacing:.04em; text-transform:uppercase; }
     .theme-toggle { width:36px; height:36px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface); color:var(--text-2); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all var(--transition); }
     .theme-toggle:hover { background:var(--bg-subtle); color:var(--text); }
@@ -122,6 +123,7 @@
     .btn-icon.delete:hover { border-color:var(--red); color:var(--red); background:var(--red-bg); }
     .btn-icon.approve:hover { border-color:var(--green); color:var(--green); background:var(--green-bg); }
     .btn-icon.pending:hover { border-color:var(--orange); color:var(--orange); background:var(--orange-bg); }
+    .btn-icon.unpublish:hover { border-color:var(--orange); color:var(--orange); background:var(--orange-bg); }
     .btn:disabled { opacity:.55; cursor:not-allowed; transform:none; }
     /* status badges */
     .status-badge { display:inline-block; padding:.15rem .55rem; border-radius:var(--radius-full); font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
@@ -129,6 +131,19 @@
     .status-badge.pending { background:var(--orange-bg); color:var(--orange); }
     .status-badge.approved { background:var(--green-bg); color:var(--green); }
     .status-badge.rejected { background:var(--red-bg); color:var(--red); }
+
+    /* ── Group headers ── */
+    .group-header td { padding:.45rem 1rem; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; background:var(--bg-subtle); border-bottom:1px solid var(--border); border-top:2px solid var(--border); }
+    tr.group-header:first-child td { border-top:none; }
+    .group-header.group-pending td { color:var(--orange); background:var(--orange-bg); border-top-color:var(--orange); }
+    .group-header.group-approved td { color:var(--green); background:var(--green-bg); border-top-color:var(--green); }
+    .group-header.group-new td { color:var(--accent); background:var(--accent-subtle); border-top-color:var(--accent); }
+    .group-header.group-rejected td { color:var(--red); background:var(--red-bg); border-top-color:var(--red); }
+    /* ── Group toggle active state ── */
+    .btn-group-active { background:var(--accent-subtle) !important; border-color:var(--accent) !important; color:var(--accent) !important; }
+    /* ── Sort select label ── */
+    .sort-wrap { display:flex; align-items:center; gap:.35rem; }
+    .sort-wrap label { font-size:.78rem; font-weight:600; color:var(--text-3); white-space:nowrap; }
 
     /* ── Table ── */
     .table-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden; }
@@ -281,11 +296,12 @@
     <div class="topnav-inner">
       <div class="topnav-brand">
         <div class="topnav-logo">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
           </svg>
         </div>
-        <span>Haolei</span>
+        <span>EngMara</span>
         <span class="topnav-badge">Dev</span>
       </div>
       <div id="api-chip" class="api-chip unset" title="Set API URL">
@@ -351,6 +367,21 @@
             <option value="en">English</option>
             <option value="mrh">Mara</option>
           </select>
+          <div class="sort-wrap">
+            <label for="sort-select">Sort</label>
+            <select id="sort-select" class="lang-select" title="Sort entries">
+              <option value="english_asc">A → Z</option>
+              <option value="english_desc">Z → A</option>
+              <option value="added_desc">Added: Newest</option>
+              <option value="added_asc">Added: Oldest</option>
+              <option value="updated_desc">Updated: Newest</option>
+              <option value="updated_asc">Updated: Oldest</option>
+            </select>
+          </div>
+          <button class="btn btn-ghost" id="group-toggle" title="Toggle grouping by status">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            Group by Status
+          </button>
           <button class="btn btn-primary" id="add-entry-btn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Entry
@@ -681,6 +712,8 @@
     searchTimer: null,
     deletingId: null,
     editingId: null,
+    sortKey: 'english_asc',  // field_dir
+    groupEntries: false,
   };
 
   // ── API client ─────────────────────────────────────────────────
@@ -765,11 +798,15 @@
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       <p>Loading…</p></div></td></tr>`;
 
+    const [_sortField, ..._sortDirParts] = state.sortKey.split('_');
+    const _sortDir = _sortDirParts.join('_') || 'asc';
     const params = new URLSearchParams({
       page: state.page,
       per_page: state.perPage,
       ...(state.query ? { q: state.query } : {}),
       ...(state.lang ? { lang: state.lang } : {}),
+      sort_by: _sortField,
+      sort_dir: _sortDir,
     });
 
     try {
@@ -805,15 +842,33 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  function renderTable(rows) {
-    const tbody = document.getElementById('entries-tbody');
-    if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <p>No entries found.</p></div></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = rows.map(r => `
+  // ── Sort & group helpers ──────────────────────────────────────
+  function sortRows(rows) {
+    const parts = state.sortKey.split('_');
+    // last segment is direction; rest is field name
+    const dir = parts[parts.length - 1]; // 'asc' or 'desc'
+    const field = parts.slice(0, -1).join('_'); // 'english', 'added', 'updated'
+    const asc = dir !== 'desc';
+    return [...rows].sort((a, b) => {
+      let av = '', bv = '';
+      if (field === 'english') {
+        av = (a.english_word || '').toLowerCase();
+        bv = (b.english_word || '').toLowerCase();
+      } else if (field === 'added') {
+        av = a.created_at || String(a.id);
+        bv = b.created_at || String(b.id);
+      } else if (field === 'updated') {
+        av = a.updated_at || a.created_at || String(a.id);
+        bv = b.updated_at || b.created_at || String(b.id);
+      }
+      if (av < bv) return asc ? -1 : 1;
+      if (av > bv) return asc ? 1 : -1;
+      return 0;
+    });
+  }
+
+  function entryRowHtml(r) {
+    return `
       <tr data-id="${r.id}">
         <td class="td-id">${r.id}</td>
         <td class="td-en">${escHtml(r.english_word)}</td>
@@ -828,7 +883,11 @@
             <button class="btn-icon approve" title="Publish" data-action="publish" data-id="${r.id}"
               data-label="${escHtml(r.english_word)}">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-            </button>` : ''}
+            </button>` : `
+            <button class="btn-icon unpublish" title="Unpublish" data-action="unpublish" data-id="${r.id}"
+              data-label="${escHtml(r.english_word)}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            </button>`}
             <button class="btn-icon edit" title="Edit" data-action="edit" data-id="${r.id}"
               data-en="${escHtml(r.english_word)}" data-mrh="${escHtml(r.mara_word)}"
               data-pos="${escHtml(r.part_of_speech||'')}" data-def="${escHtml(r.definition||'')}"
@@ -841,8 +900,39 @@
             </button>
           </div>
         </td>
-      </tr>
-    `).join('');
+      </tr>`;
+  }
+
+  function renderTable(rows) {
+    const tbody = document.getElementById('entries-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <p>No entries found.</p></div></td></tr>`;
+      return;
+    }
+    const sorted = sortRows(rows);
+    if (!state.groupEntries) {
+      tbody.innerHTML = sorted.map(entryRowHtml).join('');
+      return;
+    }
+    // Grouped rendering — two buckets: Pending (all non-approved) and Approved
+    const groups = { pending: [], approved: [] };
+    sorted.forEach(r => {
+      const s = (r.status || 'pending').toLowerCase();
+      if (s === 'approved') groups.approved.push(r);
+      else groups.pending.push(r);
+    });
+    let html = '';
+    if (groups.pending.length) {
+      html += `<tr class="group-header group-pending"><td colspan="8">Pending <span style="font-weight:400;opacity:.65">(${groups.pending.length})</span></td></tr>`;
+      html += groups.pending.map(entryRowHtml).join('');
+    }
+    if (groups.approved.length) {
+      html += `<tr class="group-header group-approved"><td colspan="8">Approved <span style="font-weight:400;opacity:.65">(${groups.approved.length})</span></td></tr>`;
+      html += groups.approved.map(entryRowHtml).join('');
+    }
+    tbody.innerHTML = html;
   }
 
   function renderSuggestions(rows) {
@@ -897,9 +987,10 @@
   document.getElementById('entries-tbody').addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
-    if (btn.dataset.action === 'edit') openEditModal(btn.dataset);
-    if (btn.dataset.action === 'delete') openConfirmModal(btn.dataset.id, btn.dataset.label);
-    if (btn.dataset.action === 'publish') publishEntry(btn, btn.dataset.id, btn.dataset.label);
+    if (btn.dataset.action === 'edit')      openEditModal(btn.dataset);
+    if (btn.dataset.action === 'delete')    openConfirmModal(btn.dataset.id, btn.dataset.label);
+    if (btn.dataset.action === 'publish')   publishEntry(btn, btn.dataset.id, btn.dataset.label);
+    if (btn.dataset.action === 'unpublish') unpublishEntry(btn, btn.dataset.id, btn.dataset.label);
   });
 
   async function publishEntry(btn, id, label) {
@@ -911,6 +1002,20 @@
       loadStats();
     } catch (err) {
       alert(`Failed to publish: ${err.message}`);
+      btn.disabled = false;
+    }
+  }
+
+  async function unpublishEntry(btn, id, label) {
+    if (!confirm(`Unpublish "${label}"? It will be set back to Pending and hidden from the public dictionary.`)) return;
+    btn.disabled = true;
+    try {
+      await api(`/api/admin/entries/${id}/unpublish`, { method: 'POST' });
+      toast(`"${label}" unpublished and set to pending.`);
+      loadEntries();
+      loadStats();
+    } catch (err) {
+      toast(`Failed to unpublish: ${err.message}`, 'error');
       btn.disabled = false;
     }
   }
@@ -975,6 +1080,19 @@
     loadSuggestions();
   });
   document.getElementById('refresh-suggestions-btn').addEventListener('click', loadSuggestions);
+
+  // ── Sort & group controls ──────────────────────────────────────
+  document.getElementById('sort-select').addEventListener('change', e => {
+    state.sortKey = e.target.value;
+    state.page = 1;
+    loadEntries();
+  });
+  document.getElementById('group-toggle').addEventListener('click', () => {
+    state.groupEntries = !state.groupEntries;
+    document.getElementById('group-toggle').classList.toggle('btn-group-active', state.groupEntries);
+  // Re-render with current data without a network request by re-sorting cached results
+    loadEntries();
+  });
 
   // ── Suggestion actions ─────────────────────────────────────────
   function openSuggestionEditModal(btn) {
@@ -1361,7 +1479,6 @@
 
     // Animate progress bar — simulated phases since job runs server-side
     let _pctVal = 0;
-    let _raf = null;
     let _phaseTimers = [];
     function setProgress(p, label) {
       _pctVal = p;
@@ -1372,32 +1489,21 @@
     function startProgress() {
       wrap.classList.add('visible');
       setProgress(0, 'Queuing sync…');
-      // Phase 1: 0→35% in 0.8s (API response received)
       _phaseTimers.push(setTimeout(() => setProgress(35, 'Exporting dictionary…'), 800));
-      // Phase 2: 35→60% in 1.5s (export done, fetching SHAs)
       _phaseTimers.push(setTimeout(() => setProgress(60, 'Fetching GitHub file SHAs…'), 2000));
-      // Phase 3: 60→80% in 2s (committing SQL)
       _phaseTimers.push(setTimeout(() => setProgress(80, 'Committing SQL to GitHub…'), 4000));
-      // Phase 4: 80→92% in 2s (committing JSON)
       _phaseTimers.push(setTimeout(() => setProgress(92, 'Committing JSON to GitHub…'), 6000));
     }
     function completeProgress() {
       _phaseTimers.forEach(clearTimeout);
       setProgress(100, 'Done ✓');
-      setTimeout(() => {
-        wrap.classList.remove('visible');
-        setProgress(0, 'Syncing…');
-      }, 1800);
+      setTimeout(() => { wrap.classList.remove('visible'); setProgress(0, 'Syncing…'); }, 1800);
     }
     function errorProgress() {
       _phaseTimers.forEach(clearTimeout);
       bar.style.background = 'var(--red)';
       setProgress(_pctVal, 'Sync failed');
-      setTimeout(() => {
-        wrap.classList.remove('visible');
-        bar.style.background = '';
-        setProgress(0, 'Syncing…');
-      }, 2500);
+      setTimeout(() => { wrap.classList.remove('visible'); bar.style.background = ''; setProgress(0, 'Syncing…'); }, 2500);
     }
 
     btn.disabled = true;
@@ -1408,7 +1514,6 @@
       if (result.queued) {
         ghLog(`Sync queued for ${result.total_entries} entries — pushing to GitHub in background…`, 'success');
         toast('Sync started. GitHub will update in a few seconds.', 'success');
-        // Auto-refresh status after GitHub has time to process
         setTimeout(() => { completeProgress(); loadGitHubStatus(); }, 8000);
       } else {
         completeProgress();

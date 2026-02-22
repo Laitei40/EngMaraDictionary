@@ -916,25 +916,22 @@
       tbody.innerHTML = sorted.map(entryRowHtml).join('');
       return;
     }
-    // Grouped rendering — order: pending, new, rejected, approved
-    const GROUP_ORDER = ['pending', 'new', 'rejected', 'approved'];
-    const GROUP_LABELS = { pending: 'Pending', new: 'New', rejected: 'Rejected', approved: 'Approved' };
-    const GROUP_CSS    = { pending: 'group-pending', new: 'group-new', rejected: 'group-rejected', approved: 'group-approved' };
-    const groups = {};
+    // Grouped rendering — two buckets: Pending (all non-approved) and Approved
+    const groups = { pending: [], approved: [] };
     sorted.forEach(r => {
       const s = (r.status || 'pending').toLowerCase();
-      (groups[s] = groups[s] || []).push(r);
-    });
-    const keys = Object.keys(groups).sort((a, b) => {
-      const oa = GROUP_ORDER.indexOf(a), ob = GROUP_ORDER.indexOf(b);
-      return (oa < 0 ? 99 : oa) - (ob < 0 ? 99 : ob);
+      if (s === 'approved') groups.approved.push(r);
+      else groups.pending.push(r);
     });
     let html = '';
-    keys.forEach(key => {
-      const label = GROUP_LABELS[key] || (key.charAt(0).toUpperCase() + key.slice(1));
-      html += `<tr class="group-header ${GROUP_CSS[key] || ''}"><td colspan="8">${label} <span style="font-weight:400;opacity:.65">(${groups[key].length})</span></td></tr>`;
-      html += groups[key].map(entryRowHtml).join('');
-    });
+    if (groups.pending.length) {
+      html += `<tr class="group-header group-pending"><td colspan="8">Pending <span style="font-weight:400;opacity:.65">(${groups.pending.length})</span></td></tr>`;
+      html += groups.pending.map(entryRowHtml).join('');
+    }
+    if (groups.approved.length) {
+      html += `<tr class="group-header group-approved"><td colspan="8">Approved <span style="font-weight:400;opacity:.65">(${groups.approved.length})</span></td></tr>`;
+      html += groups.approved.map(entryRowHtml).join('');
+    }
     tbody.innerHTML = html;
   }
 
