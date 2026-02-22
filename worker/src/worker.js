@@ -1406,6 +1406,33 @@ async function handleAdmin(request, url, env, ctx, corsHeaders) {
     }
   }
 
+  // POST /api/admin/entries/:id/unpublish — roll back approved entry to pending
+  const unpublishEntryMatch = url.pathname.match(/^\/api\/admin\/entries\/(\d+)\/unpublish$/);
+  if (unpublishEntryMatch && method === 'POST') {
+    const id = parseInt(unpublishEntryMatch[1], 10);
+    try {
+      const existing = await db.prepare('SELECT * FROM dictionary WHERE id = ?1').bind(id).first();
+      if (!existing) return jsonResponse({ error: 'Entry not found' }, 404, corsHeaders);
+      if (existing.status !== 'approved')
+        return jsonResponse({ error: 'Entry is not currently approved' }, 400, corsHeaders);
+
+      const now = new Date().toISOString();
+      await db.prepare(
+        `UPDATE dictionary SET status = 'pending', updated_by = ?1, updated_at = ?2 WHERE id = ?3`
+      ).bind(email, now, id).run();
+
+      const updated = await db.prepare('SELECT * FROM dictionary WHERE id = ?1').bind(id).first();
+      await insertAuditLog(db, {
+        action: 'unpublish_entry', table_name: 'dictionary', record_id: id,
+        performed_by: email, old_value: existing, new_value: updated,
+      });
+      ctx.waitUntil(syncToGitHub(env, db, `Unpublish entry #${id} (${existing.english_word}) by ${email}`));
+      return jsonResponse({ success: true, entry: updated }, 200, corsHeaders);
+    } catch (err) {
+      return jsonResponse({ error: 'Database error', details: err.message }, 500, corsHeaders);
+    }
+  }
+
   // POST /api/admin/entries/:id/approve — set status to approved (publish)
   const approveEntryMatch = url.pathname.match(/^\/api\/admin\/entries\/(\d+)\/approve$/);
   if (approveEntryMatch && method === 'POST') {

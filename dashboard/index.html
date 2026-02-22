@@ -123,6 +123,7 @@
     .btn-icon.delete:hover { border-color:var(--red); color:var(--red); background:var(--red-bg); }
     .btn-icon.approve:hover { border-color:var(--green); color:var(--green); background:var(--green-bg); }
     .btn-icon.pending:hover { border-color:var(--orange); color:var(--orange); background:var(--orange-bg); }
+    .btn-icon.unpublish:hover { border-color:var(--orange); color:var(--orange); background:var(--orange-bg); }
     .btn:disabled { opacity:.55; cursor:not-allowed; transform:none; }
     /* status badges */
     .status-badge { display:inline-block; padding:.15rem .55rem; border-radius:var(--radius-full); font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
@@ -882,7 +883,11 @@
             <button class="btn-icon approve" title="Publish" data-action="publish" data-id="${r.id}"
               data-label="${escHtml(r.english_word)}">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-            </button>` : ''}
+            </button>` : `
+            <button class="btn-icon unpublish" title="Unpublish" data-action="unpublish" data-id="${r.id}"
+              data-label="${escHtml(r.english_word)}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            </button>`}
             <button class="btn-icon edit" title="Edit" data-action="edit" data-id="${r.id}"
               data-en="${escHtml(r.english_word)}" data-mrh="${escHtml(r.mara_word)}"
               data-pos="${escHtml(r.part_of_speech||'')}" data-def="${escHtml(r.definition||'')}"
@@ -985,9 +990,10 @@
   document.getElementById('entries-tbody').addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
-    if (btn.dataset.action === 'edit') openEditModal(btn.dataset);
-    if (btn.dataset.action === 'delete') openConfirmModal(btn.dataset.id, btn.dataset.label);
-    if (btn.dataset.action === 'publish') publishEntry(btn, btn.dataset.id, btn.dataset.label);
+    if (btn.dataset.action === 'edit')      openEditModal(btn.dataset);
+    if (btn.dataset.action === 'delete')    openConfirmModal(btn.dataset.id, btn.dataset.label);
+    if (btn.dataset.action === 'publish')   publishEntry(btn, btn.dataset.id, btn.dataset.label);
+    if (btn.dataset.action === 'unpublish') unpublishEntry(btn, btn.dataset.id, btn.dataset.label);
   });
 
   async function publishEntry(btn, id, label) {
@@ -999,6 +1005,20 @@
       loadStats();
     } catch (err) {
       alert(`Failed to publish: ${err.message}`);
+      btn.disabled = false;
+    }
+  }
+
+  async function unpublishEntry(btn, id, label) {
+    if (!confirm(`Unpublish "${label}"? It will be set back to Pending and hidden from the public dictionary.`)) return;
+    btn.disabled = true;
+    try {
+      await api(`/api/admin/entries/${id}/unpublish`, { method: 'POST' });
+      toast(`"${label}" unpublished and set to pending.`);
+      loadEntries();
+      loadStats();
+    } catch (err) {
+      toast(`Failed to unpublish: ${err.message}`, 'error');
       btn.disabled = false;
     }
   }
