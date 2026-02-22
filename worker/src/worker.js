@@ -1224,7 +1224,10 @@ async function handleAdmin(request, url, env, ctx, corsHeaders) {
         }
       }
 
-      if (statusFilter && ['approved', 'archived', 'pending'].includes(statusFilter)) {
+      if (statusFilter === 'pending') {
+        // 'pending' tab covers all non-approved, non-archived statuses
+        whereParts.push(`status IN ('pending', 'new', 'rejected')`);
+      } else if (statusFilter && ['approved', 'archived'].includes(statusFilter)) {
         bindings.push(statusFilter);
         whereParts.push(`status = ?${bindings.length}`);
       }

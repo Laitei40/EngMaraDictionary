@@ -139,8 +139,11 @@
     .group-header.group-approved td { color:var(--green); background:var(--green-bg); border-top-color:var(--green); }
     .group-header.group-new td { color:var(--accent); background:var(--accent-subtle); border-top-color:var(--accent); }
     .group-header.group-rejected td { color:var(--red); background:var(--red-bg); border-top-color:var(--red); }
-    /* ── Group toggle active state ── */
-    .btn-group-active { background:var(--accent-subtle) !important; border-color:var(--accent) !important; color:var(--accent) !important; }
+    /* ── Status filter tabs ── */
+    .status-tabs { display:flex; gap:.25rem; }
+    .status-tab.active { background:var(--accent-subtle) !important; border-color:var(--accent) !important; color:var(--accent) !important; }
+    .status-tab[data-status="pending"].active  { background:var(--orange-bg) !important; border-color:var(--orange) !important; color:var(--orange) !important; }
+    .status-tab[data-status="approved"].active { background:var(--green-bg) !important; border-color:var(--green) !important; color:var(--green) !important; }
     /* ── Sort select label ── */
     .sort-wrap { display:flex; align-items:center; gap:.35rem; }
     .sort-wrap label { font-size:.78rem; font-weight:600; color:var(--text-3); white-space:nowrap; }
@@ -378,10 +381,10 @@
               <option value="updated_asc">Updated: Oldest</option>
             </select>
           </div>
-          <button class="btn btn-ghost" id="group-toggle" title="Toggle grouping by status">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            Group by Status
-          </button>
+          <div class="status-tabs">
+            <button class="btn btn-ghost status-tab" id="tab-pending" data-status="pending">Pending</button>
+            <button class="btn btn-ghost status-tab" id="tab-approved" data-status="approved">Approved</button>
+          </div>
           <button class="btn btn-primary" id="add-entry-btn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Entry
@@ -713,7 +716,7 @@
     deletingId: null,
     editingId: null,
     sortKey: 'english_asc',  // field_dir
-    groupEntries: false,
+    statusFilter: '',        // '' | 'pending' | 'approved'
   };
 
   // ── API client ─────────────────────────────────────────────────
@@ -805,6 +808,7 @@
       per_page: state.perPage,
       ...(state.query ? { q: state.query } : {}),
       ...(state.lang ? { lang: state.lang } : {}),
+      ...(state.statusFilter ? { status: state.statusFilter } : {}),
       sort_by: _sortField,
       sort_dir: _sortDir,
     });
@@ -911,28 +915,7 @@
         <p>No entries found.</p></div></td></tr>`;
       return;
     }
-    const sorted = sortRows(rows);
-    if (!state.groupEntries) {
-      tbody.innerHTML = sorted.map(entryRowHtml).join('');
-      return;
-    }
-    // Grouped rendering — two buckets: Pending (all non-approved) and Approved
-    const groups = { pending: [], approved: [] };
-    sorted.forEach(r => {
-      const s = (r.status || 'pending').toLowerCase();
-      if (s === 'approved') groups.approved.push(r);
-      else groups.pending.push(r);
-    });
-    let html = '';
-    if (groups.pending.length) {
-      html += `<tr class="group-header group-pending"><td colspan="8">Pending <span style="font-weight:400;opacity:.65">(${groups.pending.length})</span></td></tr>`;
-      html += groups.pending.map(entryRowHtml).join('');
-    }
-    if (groups.approved.length) {
-      html += `<tr class="group-header group-approved"><td colspan="8">Approved <span style="font-weight:400;opacity:.65">(${groups.approved.length})</span></td></tr>`;
-      html += groups.approved.map(entryRowHtml).join('');
-    }
-    tbody.innerHTML = html;
+    tbody.innerHTML = sortRows(rows).map(entryRowHtml).join('');
   }
 
   function renderSuggestions(rows) {
@@ -1087,11 +1070,16 @@
     state.page = 1;
     loadEntries();
   });
-  document.getElementById('group-toggle').addEventListener('click', () => {
-    state.groupEntries = !state.groupEntries;
-    document.getElementById('group-toggle').classList.toggle('btn-group-active', state.groupEntries);
-  // Re-render with current data without a network request by re-sorting cached results
-    loadEntries();
+  document.querySelectorAll('.status-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.dataset.status;
+      state.statusFilter = state.statusFilter === val ? '' : val;
+      document.querySelectorAll('.status-tab').forEach(b =>
+        b.classList.toggle('active', b.dataset.status === state.statusFilter)
+      );
+      state.page = 1;
+      loadEntries();
+    });
   });
 
   // ── Suggestion actions ─────────────────────────────────────────
