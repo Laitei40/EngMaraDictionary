@@ -238,10 +238,15 @@ async function exportDictionaryAsJSON(db) {
 }
 
 // ── Low-level GitHub API helpers ───────────────────────────────
+// Encode each path segment but preserve slashes
+function ghEncodePath(path) {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
 async function ghGetFileSha(token, owner, repo, path, branch) {
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`,
+      `https://api.github.com/repos/${owner}/${repo}/contents/${ghEncodePath(path)}?ref=${branch}`,
       { headers: ghHeaders(token) }
     );
     if (res.ok) { const d = await res.json(); return d.sha || null; }
@@ -263,7 +268,7 @@ function utf8ToBase64(str) {
 async function ghCommitFile(token, owner, repo, path, branch, content, message, sha) {
   const base64 = utf8ToBase64(content);
   const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
+    `https://api.github.com/repos/${owner}/${repo}/contents/${ghEncodePath(path)}`,
     {
       method: 'PUT',
       headers: ghHeaders(token),
@@ -301,12 +306,14 @@ async function ghGetLastCommit(token, owner, repo, path, branch) {
 
 async function ghFetchFileContent(token, owner, repo, path, branch) {
   const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`,
+    `https://api.github.com/repos/${owner}/${repo}/contents/${ghEncodePath(path)}?ref=${branch}`,
     { headers: ghHeaders(token) }
   );
   if (!res.ok) throw new Error(`GitHub fetch failed (${res.status}): ${path}`);
   const d = await res.json();
-  return decodeURIComponent(escape(atob(d.content.replace(/\n/g, ''))));
+  // Safe UTF-8 decode from base64 (no escape/unescape)
+  const bytes = Uint8Array.from(atob(d.content.replace(/\n/g, '')), c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }
 
 // ── Main sync: D1 → GitHub (fired after every write via ctx.waitUntil) ──
