@@ -237,12 +237,13 @@ async function exportDictionaryAsJSON(db) {
     WHERE status != 'archived'
     ORDER BY english_word ASC
   `).all();
+  // Compact (no whitespace) to minimise payload size and CPU encoding time
   return JSON.stringify({
     schema_version: '1.0',
     generated_at: new Date().toISOString(),
     total: results.length,
     entries: results,
-  }, null, 2);
+  });
 }
 
 // ── Low-level GitHub API helpers ───────────────────────────────
@@ -341,8 +342,8 @@ async function ghCommitFiles(token, owner, repo, branch, files, message) {
   for (const { path, content } of files) {
     console.log(`[ghCommitFiles] creating blob for ${path} (${content.length} bytes)`);
     const blobRes = await ghApiPost(token, `${base}/git/blobs`, {
-      content: utf8ToBase64(content),
-      encoding: 'base64',
+      content: content,
+      encoding: 'utf-8',
     });
     if (!blobRes.ok) return { success: false, step: `blob:${path}`, error: blobRes.error || blobRes.status };
     treeItems.push({ path, mode: '100644', type: 'blob', sha: blobRes.data.sha });
@@ -422,15 +423,11 @@ async function syncToGitHub(env, db, commitMessage) {
   const token = env.GITHUB_TOKEN;
   if (!token) return { skipped: true, reason: 'GITHUB_TOKEN not configured' };
   try {
-    console.log('[syncToGitHub] exporting SQL + JSON from D1...');
-    const [sqlContent, jsonContent] = await Promise.all([
-      exportDictionaryAsSQL(db),
-      exportDictionaryAsJSON(db),
-    ]);
-    console.log(`[syncToGitHub] SQL ${sqlContent.length} bytes, JSON ${jsonContent.length} bytes`);
+    console.log('[syncToGitHub] exporting JSON from D1...');
+    const jsonContent = await exportDictionaryAsJSON(db);
+    console.log(`[syncToGitHub] JSON ${jsonContent.length} bytes`);
 
     const result = await ghCommitFiles(token, cfg.owner, cfg.repo, cfg.branch, [
-      { path: cfg.sqlPath,  content: sqlContent },
       { path: cfg.jsonPath, content: jsonContent },
     ], commitMessage);
 
