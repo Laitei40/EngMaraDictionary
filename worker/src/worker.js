@@ -249,8 +249,19 @@ async function ghGetFileSha(token, owner, repo, path, branch) {
   return null;
 }
 
+function utf8ToBase64(str) {
+  // Safe base64 encoding for Cloudflare Workers (no unescape/escape)
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  const chunkSize = 0x8000; // 32 KB chunks to avoid stack overflow
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 async function ghCommitFile(token, owner, repo, path, branch, content, message, sha) {
-  const base64 = btoa(unescape(encodeURIComponent(content)));
+  const base64 = utf8ToBase64(content);
   const res = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
     {
@@ -692,6 +703,7 @@ async function handleAdmin(request, url, env, ctx, corsHeaders) {
   const db = env.DB;
   const method = request.method;
 
+  try {
   // ── Authenticate & Authorize ──
   const auth = await authenticateAdmin(request, db);
   if (auth.error) {
@@ -1562,6 +1574,10 @@ async function handleAdmin(request, url, env, ctx, corsHeaders) {
   }
 
   return jsonResponse({ error: 'Admin route not found' }, 404, corsHeaders);
+  } catch (err) {
+    console.error('Unhandled admin error:', err);
+    return jsonResponse({ error: 'Internal server error', details: err.message }, 500, corsHeaders);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
