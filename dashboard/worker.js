@@ -67,7 +67,9 @@ export default {
 
       try {
         // Use the Service Binding — direct Worker-to-Worker call, no network hop
+        console.log(`[proxy] → ${request.method} ${url.pathname} email="${email || '(none)'}"`);
         const response = await env.API.fetch(proxyRequest);
+        console.log(`[proxy] ← ${response.status} ${url.pathname}`);
 
         // Re-wrap response so we can add CORS headers for the browser
         const newHeaders = new Headers(response.headers);
@@ -80,7 +82,8 @@ export default {
           headers: newHeaders,
         });
       } catch (err) {
-        return new Response(JSON.stringify({ error: 'Proxy error', details: err.message }), {
+        console.error(`[proxy] CATCH ${url.pathname}: ${err.name}: ${err.message}`, err.stack || '');
+        return new Response(JSON.stringify({ error: 'Proxy error', details: err.message, name: err.name }), {
           status: 502,
           headers: { 'Content-Type': 'application/json' },
         });

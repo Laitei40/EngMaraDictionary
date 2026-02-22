@@ -60,7 +60,15 @@ export default {
     }
 
     if (url.pathname.startsWith('/api/admin/')) {
-      return await handleAdmin(request, url, env, ctx, adminCorsHeaders);
+      try {
+        return await handleAdmin(request, url, env, ctx, adminCorsHeaders);
+      } catch (err) {
+        console.error('Top-level admin error:', err.message, err.stack);
+        return new Response(JSON.stringify({ error: 'Internal server error', details: err.message }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...adminCorsHeaders },
+        });
+      }
     }
 
     if (url.pathname === '/api/suggestions') {
@@ -243,14 +251,25 @@ function ghEncodePath(path) {
   return path.split('/').map(encodeURIComponent).join('/');
 }
 
+function withTimeout(ms) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  return { signal: ctrl.signal, clear: () => clearTimeout(id) };
+}
+
 async function ghGetFileSha(token, owner, repo, path, branch) {
+  const { signal, clear } = withTimeout(5000);
   try {
     const res = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${ghEncodePath(path)}?ref=${branch}`,
-      { headers: ghHeaders(token) }
+      { headers: ghHeaders(token), signal }
     );
+    clear();
     if (res.ok) { const d = await res.json(); return d.sha || null; }
-  } catch {}
+  } catch (e) {
+    clear();
+    if (e.name === 'AbortError') throw new Error(`GitHub SHA lookup timed out for ${path}`);
+  }
   return null;
 }
 
@@ -267,14 +286,24 @@ function utf8ToBase64(str) {
 
 async function ghCommitFile(token, owner, repo, path, branch, content, message, sha) {
   const base64 = utf8ToBase64(content);
-  const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${ghEncodePath(path)}`,
-    {
-      method: 'PUT',
-      headers: ghHeaders(token),
-      body: JSON.stringify({ message, content: base64, branch, ...(sha ? { sha } : {}) }),
-    }
-  );
+  const { signal, clear } = withTimeout(12000);
+  let res;
+  try {
+    res = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${ghEncodePath(path)}`,
+      {
+        method: 'PUT',
+        headers: ghHeaders(token),
+        body: JSON.stringify({ message, content: base64, branch, ...(sha ? { sha } : {}) }),
+        signal,
+      }
+    );
+    clear();
+  } catch (e) {
+    clear();
+    const msg = e.name === 'AbortError' ? `GitHub commit timed out for ${path}` : e.message;
+    return { success: false, error: msg };
+  }
   if (!res.ok) {
     let errText;
     try { errText = await res.text(); } catch { errText = `HTTP ${res.status}`; }
@@ -286,11 +315,13 @@ async function ghCommitFile(token, owner, repo, path, branch, content, message, 
 }
 
 async function ghGetLastCommit(token, owner, repo, path, branch) {
+  const { signal, clear } = withTimeout(5000);
   try {
     const res = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/commits?path=${encodeURIComponent(path)}&per_page=1&sha=${branch}`,
-      { headers: ghHeaders(token) }
+      { headers: ghHeaders(token), signal }
     );
+    clear();
     if (!res.ok) return null;
     const commits = await res.json();
     if (!Array.isArray(commits) || !commits.length) return null;
@@ -303,14 +334,22 @@ async function ghGetLastCommit(token, owner, repo, path, branch) {
       date:      c.commit.author.date,
       url:       c.html_url,
     };
-  } catch { return null; }
+  } catch { clear(); return null; }
 }
 
 async function ghFetchFileContent(token, owner, repo, path, branch) {
-  const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${ghEncodePath(path)}?ref=${branch}`,
-    { headers: ghHeaders(token) }
-  );
+  const { signal, clear } = withTimeout(12000);
+  let res;
+  try {
+    res = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${ghEncodePath(path)}?ref=${branch}`,
+      { headers: ghHeaders(token), signal }
+    );
+    clear();
+  } catch (e) {
+    clear();
+    throw new Error(e.name === 'AbortError' ? `GitHub fetch timed out: ${path}` : e.message);
+  }
   if (!res.ok) throw new Error(`GitHub fetch failed (${res.status}): ${path}`);
   const d = await res.json();
   // Safe UTF-8 decode from base64 (no escape/unescape)
@@ -324,24 +363,33 @@ async function syncToGitHub(env, db, commitMessage) {
   const token = env.GITHUB_TOKEN;
   if (!token) return { skipped: true, reason: 'GITHUB_TOKEN not configured' };
   try {
+    console.log('[syncToGitHub] exporting SQL + JSON from D1...');
     const [sqlContent, jsonContent] = await Promise.all([
       exportDictionaryAsSQL(db),
       exportDictionaryAsJSON(db),
     ]);
+    console.log(`[syncToGitHub] SQL ${sqlContent.length} bytes, JSON ${jsonContent.length} bytes`);
 
     // Fetch both file SHAs in parallel (read-only, no conflict risk)
+    console.log('[syncToGitHub] fetching file SHAs...');
     const [sqlSha, jsonSha] = await Promise.all([
       ghGetFileSha(token, cfg.owner, cfg.repo, cfg.sqlPath, cfg.branch),
       ghGetFileSha(token, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch),
     ]);
+    console.log(`[syncToGitHub] sqlSha=${sqlSha}, jsonSha=${jsonSha}`);
 
     // Commit sequentially — parallel commits to the same repo can produce 409 Conflicts
+    console.log('[syncToGitHub] committing SQL...');
     const sqlResult = await ghCommitFile(
       token, cfg.owner, cfg.repo, cfg.sqlPath, cfg.branch, sqlContent, commitMessage, sqlSha
     );
+    console.log('[syncToGitHub] SQL commit result:', JSON.stringify(sqlResult));
+
+    console.log('[syncToGitHub] committing JSON...');
     const jsonResult = await ghCommitFile(
       token, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch, jsonContent, commitMessage, jsonSha
     );
+    console.log('[syncToGitHub] JSON commit result:', JSON.stringify(jsonResult));
 
     return {
       success: sqlResult.success && jsonResult.success,
@@ -1512,10 +1560,13 @@ async function handleAdmin(request, url, env, ctx, corsHeaders) {
     if (!env.GITHUB_TOKEN)
       return jsonResponse({ error: 'GITHUB_TOKEN not configured on this worker' }, 503, corsHeaders);
     try {
+      console.log('[sync] starting for', email);
       const countRow = await db.prepare("SELECT COUNT(*) AS total FROM dictionary WHERE status != 'archived'").first();
       const total = countRow?.total || 0;
+      console.log('[sync] entry count:', total);
       const message = `Manual sync: ${total} entries — by ${email}`;
       const result = await syncToGitHub(env, db, message);
+      console.log('[sync] syncToGitHub result:', JSON.stringify(result));
       if (!result.success && !result.skipped)
         return jsonResponse({ error: 'GitHub sync failed', details: result }, 500, corsHeaders);
       await insertAuditLog(db, {
