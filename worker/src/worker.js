@@ -257,61 +257,121 @@ function withTimeout(ms) {
   return { signal: ctrl.signal, clear: () => clearTimeout(id) };
 }
 
-async function ghGetFileSha(token, owner, repo, path, branch) {
-  const { signal, clear } = withTimeout(5000);
-  try {
-    const res = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/contents/${ghEncodePath(path)}?ref=${branch}`,
-      { headers: ghHeaders(token), signal }
-    );
-    clear();
-    if (res.ok) { const d = await res.json(); return d.sha || null; }
-  } catch (e) {
-    clear();
-    if (e.name === 'AbortError') throw new Error(`GitHub SHA lookup timed out for ${path}`);
-  }
-  return null;
-}
-
 function utf8ToBase64(str) {
   // Safe base64 encoding for Cloudflare Workers (no unescape/escape)
   const bytes = new TextEncoder().encode(str);
   let binary = '';
-  const chunkSize = 0x8000; // 32 KB chunks to avoid stack overflow
+  const chunkSize = 0x8000;
   for (let i = 0; i < bytes.length; i += chunkSize) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
   return btoa(binary);
 }
 
-async function ghCommitFile(token, owner, repo, path, branch, content, message, sha) {
-  const base64 = utf8ToBase64(content);
-  const { signal, clear } = withTimeout(12000);
-  let res;
+// ── Git Data API helpers (no 1 MB file size limit) ────────────
+
+async function ghApiPost(token, url, body) {
+  const { signal, clear } = withTimeout(60000);
   try {
-    res = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/contents/${ghEncodePath(path)}`,
-      {
-        method: 'PUT',
-        headers: ghHeaders(token),
-        body: JSON.stringify({ message, content: base64, branch, ...(sha ? { sha } : {}) }),
-        signal,
-      }
-    );
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: ghHeaders(token),
+      body: JSON.stringify(body),
+      signal,
+    });
     clear();
+    const text = await res.text();
+    if (!res.ok) return { ok: false, status: res.status, error: text };
+    return { ok: true, data: JSON.parse(text) };
   } catch (e) {
     clear();
-    const msg = e.name === 'AbortError' ? `GitHub commit timed out for ${path}` : e.message;
-    return { success: false, error: msg };
+    return { ok: false, error: e.message };
   }
-  if (!res.ok) {
-    let errText;
-    try { errText = await res.text(); } catch { errText = `HTTP ${res.status}`; }
-    return { success: false, status: res.status, error: errText };
+}
+
+async function ghApiGet(token, url) {
+  const { signal, clear } = withTimeout(15000);
+  try {
+    const res = await fetch(url, { headers: ghHeaders(token), signal });
+    clear();
+    if (!res.ok) return { ok: false, status: res.status };
+    return { ok: true, data: await res.json() };
+  } catch (e) {
+    clear();
+    return { ok: false, error: e.message };
   }
-  let d;
-  try { d = await res.json(); } catch { return { success: true }; }
-  return { success: true, commit_sha: d.commit?.sha, file_sha: d.content?.sha };
+}
+
+async function ghApiPatch(token, url, body) {
+  const { signal, clear } = withTimeout(15000);
+  try {
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: ghHeaders(token),
+      body: JSON.stringify(body),
+      signal,
+    });
+    clear();
+    const text = await res.text();
+    if (!res.ok) return { ok: false, status: res.status, error: text };
+    return { ok: true, data: JSON.parse(text) };
+  } catch (e) {
+    clear();
+    return { ok: false, error: e.message };
+  }
+}
+
+// Commit multiple files in one GitHub commit using the Git Data API.
+// Handles files of any size (no 1 MB Contents API limit).
+async function ghCommitFiles(token, owner, repo, branch, files, message) {
+  const base = `https://api.github.com/repos/${owner}/${repo}`;
+
+  // 1. Get current HEAD ref
+  const refRes = await ghApiGet(token, `${base}/git/ref/heads/${branch}`);
+  if (!refRes.ok) return { success: false, step: 'get_ref', error: refRes.error || refRes.status };
+  const headSha = refRes.data.object.sha;
+
+  // 2. Get tree SHA of current HEAD commit
+  const commitRes = await ghApiGet(token, `${base}/git/commits/${headSha}`);
+  if (!commitRes.ok) return { success: false, step: 'get_commit', error: commitRes.error || commitRes.status };
+  const baseTreeSha = commitRes.data.tree.sha;
+
+  // 3. Create blobs for each file
+  const treeItems = [];
+  for (const { path, content } of files) {
+    console.log(`[ghCommitFiles] creating blob for ${path} (${content.length} bytes)`);
+    const blobRes = await ghApiPost(token, `${base}/git/blobs`, {
+      content: utf8ToBase64(content),
+      encoding: 'base64',
+    });
+    if (!blobRes.ok) return { success: false, step: `blob:${path}`, error: blobRes.error || blobRes.status };
+    treeItems.push({ path, mode: '100644', type: 'blob', sha: blobRes.data.sha });
+  }
+
+  // 4. Create new tree
+  const treeRes = await ghApiPost(token, `${base}/git/trees`, {
+    base_tree: baseTreeSha,
+    tree: treeItems,
+  });
+  if (!treeRes.ok) return { success: false, step: 'create_tree', error: treeRes.error || treeRes.status };
+
+  // 5. Create new commit
+  const newCommitRes = await ghApiPost(token, `${base}/git/commits`, {
+    message,
+    tree: treeRes.data.sha,
+    parents: [headSha],
+  });
+  if (!newCommitRes.ok) return { success: false, step: 'create_commit', error: newCommitRes.error || newCommitRes.status };
+  const newCommitSha = newCommitRes.data.sha;
+
+  // 6. Advance branch ref
+  const updateRes = await ghApiPatch(token, `${base}/git/refs/heads/${branch}`, {
+    sha: newCommitSha,
+    force: false,
+  });
+  if (!updateRes.ok) return { success: false, step: 'update_ref', error: updateRes.error || updateRes.status };
+
+  return { success: true, commit_sha: newCommitSha };
 }
 
 async function ghGetLastCommit(token, owner, repo, path, branch) {
@@ -352,12 +412,11 @@ async function ghFetchFileContent(token, owner, repo, path, branch) {
   }
   if (!res.ok) throw new Error(`GitHub fetch failed (${res.status}): ${path}`);
   const d = await res.json();
-  // Safe UTF-8 decode from base64 (no escape/unescape)
   const bytes = Uint8Array.from(atob(d.content.replace(/\n/g, '')), c => c.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 }
 
-// ── Main sync: D1 → GitHub (fired after every write via ctx.waitUntil) ──
+// ── Main sync: D1 → GitHub ─────────────────────────────────────
 async function syncToGitHub(env, db, commitMessage) {
   const cfg = ghConfig(env);
   const token = env.GITHUB_TOKEN;
@@ -370,33 +429,13 @@ async function syncToGitHub(env, db, commitMessage) {
     ]);
     console.log(`[syncToGitHub] SQL ${sqlContent.length} bytes, JSON ${jsonContent.length} bytes`);
 
-    // Fetch both file SHAs in parallel (read-only, no conflict risk)
-    console.log('[syncToGitHub] fetching file SHAs...');
-    const [sqlSha, jsonSha] = await Promise.all([
-      ghGetFileSha(token, cfg.owner, cfg.repo, cfg.sqlPath, cfg.branch),
-      ghGetFileSha(token, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch),
-    ]);
-    console.log(`[syncToGitHub] sqlSha=${sqlSha}, jsonSha=${jsonSha}`);
+    const result = await ghCommitFiles(token, cfg.owner, cfg.repo, cfg.branch, [
+      { path: cfg.sqlPath,  content: sqlContent },
+      { path: cfg.jsonPath, content: jsonContent },
+    ], commitMessage);
 
-    // Commit sequentially — parallel commits to the same repo can produce 409 Conflicts
-    console.log('[syncToGitHub] committing SQL...');
-    const sqlResult = await ghCommitFile(
-      token, cfg.owner, cfg.repo, cfg.sqlPath, cfg.branch, sqlContent, commitMessage, sqlSha
-    );
-    console.log('[syncToGitHub] SQL commit result:', JSON.stringify(sqlResult));
-
-    console.log('[syncToGitHub] committing JSON...');
-    const jsonResult = await ghCommitFile(
-      token, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch, jsonContent, commitMessage, jsonSha
-    );
-    console.log('[syncToGitHub] JSON commit result:', JSON.stringify(jsonResult));
-
-    return {
-      success: sqlResult.success && jsonResult.success,
-      commit_sha: sqlResult.commit_sha || jsonResult.commit_sha,
-      sql:  sqlResult,
-      json: jsonResult,
-    };
+    console.log('[syncToGitHub] result:', JSON.stringify(result));
+    return result;
   } catch (err) {
     console.error('syncToGitHub error:', err.message);
     return { success: false, error: err.message };
