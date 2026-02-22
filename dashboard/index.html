@@ -256,6 +256,14 @@
     .github-log p+p { margin-top:.2rem; padding-top:.2rem; border-top:1px solid var(--border-light); }
     .github-log.visible { display:block; }
     .gh-last-action { font-size:.78rem; color:var(--text-3); }
+    /* ── Sync Progress Bar ── */
+    .sync-progress-wrap { display:none; margin-top:1rem; }
+    .sync-progress-wrap.visible { display:block; }
+    .sync-progress-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:.4rem; }
+    .sync-progress-label { font-size:.78rem; font-weight:600; color:var(--text-2); }
+    .sync-progress-pct { font-size:.78rem; font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; }
+    .sync-progress-track { height:6px; background:var(--bg-inset); border-radius:var(--radius-full); overflow:hidden; }
+    .sync-progress-bar { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),#60a5fa); border-radius:var(--radius-full); transition:width .4s cubic-bezier(.4,0,.2,1); }
 
     /* ── Responsive ── */
     @media (max-width:640px) {
@@ -462,6 +470,17 @@
               Publish Live
             </button>
             <span class="gh-last-action" id="gh-last-action"></span>
+          </div>
+
+          <!-- Sync progress bar -->
+          <div class="sync-progress-wrap" id="sync-progress-wrap">
+            <div class="sync-progress-header">
+              <span class="sync-progress-label" id="sync-progress-label">Syncing…</span>
+              <span class="sync-progress-pct" id="sync-progress-pct">0%</span>
+            </div>
+            <div class="sync-progress-track">
+              <div class="sync-progress-bar" id="sync-progress-bar"></div>
+            </div>
           </div>
 
           <div class="github-log" id="github-log"></div>
@@ -1314,21 +1333,57 @@
 
   document.getElementById('github-sync-btn').addEventListener('click', async () => {
     const btn = document.getElementById('github-sync-btn');
+    const wrap = document.getElementById('sync-progress-wrap');
+    const bar  = document.getElementById('sync-progress-bar');
+    const pct  = document.getElementById('sync-progress-pct');
+    const lbl  = document.getElementById('sync-progress-label');
+
+    // Animate progress bar — simulated phases since job runs server-side
+    let _pctVal = 0;
+    let _phaseTimers = [];
+    function setProgress(p, label) {
+      _pctVal = p;
+      bar.style.width = p + '%';
+      pct.textContent = Math.round(p) + '%';
+      if (label) lbl.textContent = label;
+    }
+    function startProgress() {
+      wrap.classList.add('visible');
+      setProgress(0, 'Queuing sync…');
+      _phaseTimers.push(setTimeout(() => setProgress(35, 'Exporting dictionary…'), 800));
+      _phaseTimers.push(setTimeout(() => setProgress(60, 'Fetching GitHub file SHAs…'), 2000));
+      _phaseTimers.push(setTimeout(() => setProgress(80, 'Committing SQL to GitHub…'), 4000));
+      _phaseTimers.push(setTimeout(() => setProgress(92, 'Committing JSON to GitHub…'), 6000));
+    }
+    function completeProgress() {
+      _phaseTimers.forEach(clearTimeout);
+      setProgress(100, 'Done ✓');
+      setTimeout(() => { wrap.classList.remove('visible'); setProgress(0, 'Syncing…'); }, 1800);
+    }
+    function errorProgress() {
+      _phaseTimers.forEach(clearTimeout);
+      bar.style.background = 'var(--red)';
+      setProgress(_pctVal, 'Sync failed');
+      setTimeout(() => { wrap.classList.remove('visible'); bar.style.background = ''; setProgress(0, 'Syncing…'); }, 2500);
+    }
+
     btn.disabled = true;
     btn.textContent = 'Syncing…';
+    startProgress();
     try {
       const result = await api('/api/admin/github/sync', { method: 'POST' });
       if (result.queued) {
         ghLog(`Sync queued for ${result.total_entries} entries — pushing to GitHub in background…`, 'success');
         toast('Sync started. GitHub will update in a few seconds.', 'success');
-        // Auto-refresh status after GitHub has time to process
-        setTimeout(() => loadGitHubStatus(), 8000);
+        setTimeout(() => { completeProgress(); loadGitHubStatus(); }, 8000);
       } else {
+        completeProgress();
         ghLog(`Synced ${result.total_entries} entries → ${result.commit_sha ? result.commit_sha.slice(0,7) : 'unchanged'}`, 'success');
         toast('Dictionary synced to GitHub.', 'success');
         loadGitHubStatus();
       }
     } catch (err) {
+      errorProgress();
       ghLog(`Sync failed: ${err.message}`, 'error');
       toast(`GitHub sync failed: ${err.message}`, 'error');
     } finally {
