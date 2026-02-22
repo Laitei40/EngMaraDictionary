@@ -276,10 +276,12 @@ async function ghCommitFile(token, owner, repo, path, branch, content, message, 
     }
   );
   if (!res.ok) {
-    const err = await res.text();
-    return { success: false, status: res.status, error: err };
+    let errText;
+    try { errText = await res.text(); } catch { errText = `HTTP ${res.status}`; }
+    return { success: false, status: res.status, error: errText };
   }
-  const d = await res.json();
+  let d;
+  try { d = await res.json(); } catch { return { success: true }; }
   return { success: true, commit_sha: d.commit?.sha, file_sha: d.content?.sha };
 }
 
@@ -326,17 +328,24 @@ async function syncToGitHub(env, db, commitMessage) {
       exportDictionaryAsSQL(db),
       exportDictionaryAsJSON(db),
     ]);
+
+    // Fetch both file SHAs in parallel (read-only, no conflict risk)
     const [sqlSha, jsonSha] = await Promise.all([
       ghGetFileSha(token, cfg.owner, cfg.repo, cfg.sqlPath, cfg.branch),
       ghGetFileSha(token, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch),
     ]);
-    const [sqlResult, jsonResult] = await Promise.all([
-      ghCommitFile(token, cfg.owner, cfg.repo, cfg.sqlPath, cfg.branch, sqlContent, commitMessage, sqlSha),
-      ghCommitFile(token, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch, jsonContent, commitMessage, jsonSha),
-    ]);
+
+    // Commit sequentially — parallel commits to the same repo can produce 409 Conflicts
+    const sqlResult = await ghCommitFile(
+      token, cfg.owner, cfg.repo, cfg.sqlPath, cfg.branch, sqlContent, commitMessage, sqlSha
+    );
+    const jsonResult = await ghCommitFile(
+      token, cfg.owner, cfg.repo, cfg.jsonPath, cfg.branch, jsonContent, commitMessage, jsonSha
+    );
+
     return {
       success: sqlResult.success && jsonResult.success,
-      commit_sha: sqlResult.commit_sha,
+      commit_sha: sqlResult.commit_sha || jsonResult.commit_sha,
       sql:  sqlResult,
       json: jsonResult,
     };
